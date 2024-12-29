@@ -76,7 +76,7 @@ export default function CardViewer() {
       </div>
       {card ? (
         <Card 
-          className="p-4 h-64 flex justify-center items-center" 
+          className="p-4 h-96 flex justify-center items-center" 
           onTouchStart={handleTouch}
           onClick={handleClick}
         >
