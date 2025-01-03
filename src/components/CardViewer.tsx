@@ -1,17 +1,27 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Card } from "@/components/ui/card"
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/hooks/use-toast'
 import { fetchCard } from '@/app/action'
 
-export default function CardViewer() {
-  const [bookCode, setBookCode] = useState('')
+interface CardViewerProps {
+  initialBookCode?: string;
+}
+
+export default function CardViewer({ initialBookCode = '' }: CardViewerProps) {
+  const [bookCode, setBookCode] = useState(initialBookCode)
   const [cardNumber, setCardNumber] = useState(1)
   const [card, setCard] = useState<{ card_context: string } | null>(null)
   const { toast } = useToast()
+
+  useEffect(() => {
+    if (bookCode) {
+      handleFetchCard('current')
+    }
+  }, [bookCode])
 
   const handleFetchCard = async (direction: 'current' | 'next' | 'previous') => {
     try {
@@ -55,13 +65,6 @@ export default function CardViewer() {
   return (
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row gap-4">
-        <Input
-          type="text"
-          placeholder="Book Code"
-          value={bookCode}
-          onChange={(e) => setBookCode(e.target.value)}
-          className="flex-grow"
-        />
         <Input
           type="number"
           placeholder="Card Number"
