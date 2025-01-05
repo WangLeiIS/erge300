@@ -17,19 +17,6 @@ export default function CardViewer({ initialBookCode = '' }: CardViewerProps) {
   const [card, setCard] = useState<{ card_context: string } | null>(null)
   const { toast } = useToast()
 
-  useEffect(() => {
-    if (bookCode) {
-      const savedProgress = localStorage.getItem(`book_progress_${bookCode}`)
-      if (savedProgress) {
-        const progress = parseInt(savedProgress)
-        setCardNumber(progress)
-        handleFetchCard('current', progress)
-      } else {
-        handleFetchCard('current', 1)
-      }
-    }
-  }, [bookCode])
-
   const handleFetchCard = useCallback(async (direction: 'current' | 'next' | 'previous', num?: number) => {
     try {
       let newNum = num ?? cardNumber
@@ -51,6 +38,19 @@ export default function CardViewer({ initialBookCode = '' }: CardViewerProps) {
       })
     }
   }, [bookCode, cardNumber, toast])
+
+  useEffect(() => {
+    if (bookCode) {
+      const savedProgress = localStorage.getItem(`book_progress_${bookCode}`)
+      if (savedProgress) {
+        const progress = parseInt(savedProgress)
+        setCardNumber(progress)
+        handleFetchCard('current', progress)
+      } else {
+        handleFetchCard('current', 1)
+      }
+    }
+  }, [bookCode, handleFetchCard])
 
   const handleCardClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect()
