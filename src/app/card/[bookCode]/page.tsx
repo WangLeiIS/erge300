@@ -1,5 +1,11 @@
 import CardPageClient from './CardPageClient'
 
-export default function CardPage({ params }: { params: { bookCode: string } }) {
+interface PageProps {
+  params: {
+    bookCode: string
+  }
+}
+
+export default function CardPage({ params }: PageProps) {
   return <CardPageClient bookCode={params.bookCode} />
 }
