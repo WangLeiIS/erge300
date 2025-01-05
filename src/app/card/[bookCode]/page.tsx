@@ -6,6 +6,6 @@ interface PageProps {
   }
 }
 
-export default function CardPage({ params }: PageProps) {
+export default async function CardPage({ params }: PageProps) {
   return <CardPageClient bookCode={params.bookCode} />
 }

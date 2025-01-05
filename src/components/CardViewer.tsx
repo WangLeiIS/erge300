@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Card } from "@/components/ui/card"
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -30,7 +30,7 @@ export default function CardViewer({ initialBookCode = '' }: CardViewerProps) {
     }
   }, [bookCode])
 
-  const handleFetchCard = async (direction: 'current' | 'next' | 'previous', num?: number) => {
+  const handleFetchCard = useCallback(async (direction: 'current' | 'next' | 'previous', num?: number) => {
     try {
       let newNum = num ?? cardNumber
       if (direction === 'next') newNum++
@@ -50,7 +50,7 @@ export default function CardViewer({ initialBookCode = '' }: CardViewerProps) {
         variant: 'destructive',
       })
     }
-  }
+  }, [bookCode, cardNumber, toast])
 
   const handleCardClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect()
