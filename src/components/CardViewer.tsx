@@ -19,22 +19,30 @@ export default function CardViewer({ initialBookCode = '' }: CardViewerProps) {
 
   useEffect(() => {
     if (bookCode) {
-      handleFetchCard('current')
+      const savedProgress = localStorage.getItem(`book_progress_${bookCode}`)
+      if (savedProgress) {
+        const progress = parseInt(savedProgress)
+        setCardNumber(progress)
+        handleFetchCard('current', progress)
+      } else {
+        handleFetchCard('current', 1)
+      }
     }
   }, [bookCode])
 
-  const handleFetchCard = async (direction: 'current' | 'next' | 'previous') => {
+  const handleFetchCard = async (direction: 'current' | 'next' | 'previous', num?: number) => {
     try {
-      let num = cardNumber
-      if (direction === 'next') num++
-      if (direction === 'previous') num = Math.max(1, num - 1)
+      let newNum = num ?? cardNumber
+      if (direction === 'next') newNum++
+      if (direction === 'previous') newNum = Math.max(1, newNum - 1)
 
-      const result = await fetchCard(bookCode, num)
+      const result = await fetchCard(bookCode, newNum)
       if (result.error) {
         throw new Error(result.error)
       }
       setCard(result.card)
-      setCardNumber(num)
+      setCardNumber(newNum)
+      localStorage.setItem(`book_progress_${bookCode}`, newNum.toString())
     } catch (error) {
       toast({
         title: 'Error',
@@ -44,22 +52,16 @@ export default function CardViewer({ initialBookCode = '' }: CardViewerProps) {
     }
   }
 
-  const handleInteraction = (clientX: number) => {
-    const screenWidth = window.innerWidth;
+  const handleCardClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect()
+    const clickY = e.clientY - rect.top
+    const cardHeight = rect.height
     
-    if (clientX < screenWidth / 2) {
-      handleFetchCard('previous');
+    if (clickY < cardHeight / 2) {
+      handleFetchCard('previous')
     } else {
-      handleFetchCard('next');
+      handleFetchCard('next')
     }
-  }
-
-  const handleTouch = (e: React.TouchEvent) => {
-    handleInteraction(e.touches[0].clientX);
-  }
-
-  const handleClick = (e: React.MouseEvent) => {
-    handleInteraction(e.clientX);
   }
 
   return (
@@ -69,7 +71,11 @@ export default function CardViewer({ initialBookCode = '' }: CardViewerProps) {
           type="number"
           placeholder="Card Number"
           value={cardNumber}
-          onChange={(e) => setCardNumber(parseInt(e.target.value) || 1)}
+          onChange={(e) => {
+            const newNum = parseInt(e.target.value) || 1
+            setCardNumber(newNum)
+            handleFetchCard('current', newNum)
+          }}
           min={1}
           className="flex-grow"
         />
@@ -79,9 +85,8 @@ export default function CardViewer({ initialBookCode = '' }: CardViewerProps) {
       </div>
       {card ? (
         <Card 
-          className="p-4 h-96 flex justify-center items-center" 
-          onTouchStart={handleTouch}
-          onClick={handleClick}
+          className="p-4 h-96 flex justify-center items-center cursor-pointer" 
+          onClick={handleCardClick}
         >
           <p>{card.card_context}</p>
         </Card>
