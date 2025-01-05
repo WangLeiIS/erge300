@@ -1,17 +1,19 @@
 import { Metadata } from 'next'
 import CardPageClient from './CardPageClient'
 
-type Props = {
+interface PageProps {
   params: {
     bookCode: string
   }
-  searchParams: { [key: string]: string | string[] | undefined }
+  searchParams: Record<string, string | string[] | undefined>
 }
 
 export const metadata: Metadata = {
   title: 'Card View',
 }
 
-export default function CardPage({ params }: Props) {
+const CardPage = ({ params }: PageProps) => {
   return <CardPageClient bookCode={params.bookCode} />
 }
+
+export default CardPage
