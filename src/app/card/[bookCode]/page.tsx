@@ -1,19 +1,18 @@
 import { Metadata } from 'next'
 import CardPageClient from './CardPageClient'
-
-interface PageProps {
-  params: {
-    bookCode: string
-  }
-  searchParams: Record<string, string | string[] | undefined>
-}
+import { fetchBooks } from '@/app/action'
 
 export const metadata: Metadata = {
   title: 'Card View',
 }
 
-const CardPage = ({ params }: PageProps) => {
+export default async function CardPage({
+  params,
+}: {
+  params: { bookCode: string }
+}) {
+  // 预加载书籍数据
+  await fetchBooks()
+  
   return <CardPageClient bookCode={params.bookCode} />
 }
-
-export default CardPage
