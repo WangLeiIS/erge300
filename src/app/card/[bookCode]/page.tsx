@@ -12,7 +12,11 @@ export default async function CardPage({
   params: { bookCode: string }
 }) {
   // 预加载书籍数据
-  await fetchBooks()
+  const result = await fetchBooks()
+  const book = result.books?.find(b => b.book_code === params.bookCode)
   
-  return <CardPageClient bookCode={params.bookCode} />
+  return <CardPageClient 
+    bookCode={params.bookCode}
+    initialBook={book}
+  />
 }

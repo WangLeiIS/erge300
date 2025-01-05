@@ -1,18 +1,18 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Card } from "@/components/ui/card"
-import { Input } from '@/components/ui/input'
-import { Button } from '@/components/ui/button'
 import { useToast } from '@/hooks/use-toast'
 import { fetchCard } from '@/app/action'
+import { Card } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 
 interface CardViewerProps {
-  initialBookCode?: string;
+  initialBookCode: string
 }
 
-export default function CardViewer({ initialBookCode = '' }: CardViewerProps) {
-  const [bookCode, setBookCode] = useState(initialBookCode)
+export default function CardViewer({ initialBookCode }: CardViewerProps) {
+  const [bookCode] = useState(initialBookCode)
   const [cardNumber, setCardNumber] = useState(1)
   const [card, setCard] = useState<{ card_context: string } | null>(null)
   const { toast } = useToast()
@@ -52,45 +52,32 @@ export default function CardViewer({ initialBookCode = '' }: CardViewerProps) {
     }
   }, [bookCode, handleFetchCard])
 
-  const handleCardClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect()
-    const clickY = e.clientY - rect.top
-    const cardHeight = rect.height
-    
-    if (clickY < cardHeight / 2) {
-      handleFetchCard('previous')
-    } else {
-      handleFetchCard('next')
-    }
-  }
-
   return (
     <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row gap-4">
-        <Input
-          type="number"
-          placeholder="Card Number"
-          value={cardNumber}
-          onChange={(e) => {
-            const newNum = parseInt(e.target.value) || 1
-            setCardNumber(newNum)
-            handleFetchCard('current', newNum)
-          }}
-          min={1}
-          className="flex-grow"
-        />
-        <Button onClick={() => handleFetchCard('current')}>
-          Get Card
+      <Card className="min-h-[60vh] p-6 flex items-center justify-center">
+        <p className="text-center text-lg whitespace-pre-wrap">
+          {card?.card_context || '暂无内容'}
+        </p>
+      </Card>
+      
+      <div className="flex justify-between items-center">
+        <Button
+          variant="outline"
+          onClick={() => handleFetchCard('previous')}
+          disabled={cardNumber <= 1}
+        >
+          <ChevronLeft className="h-4 w-4 mr-2" />
+          上一页
+        </Button>
+        <span className="text-sm text-muted-foreground">第 {cardNumber} 页</span>
+        <Button
+          variant="outline"
+          onClick={() => handleFetchCard('next')}
+        >
+          下一页
+          <ChevronRight className="h-4 w-4 ml-2" />
         </Button>
       </div>
-      {card ? (
-        <Card 
-          className="p-4 h-96 flex justify-center items-center cursor-pointer" 
-          onClick={handleCardClick}
-        >
-          <p>{card.card_context}</p>
-        </Card>
-      ) : null}
     </div>
   )
 }
