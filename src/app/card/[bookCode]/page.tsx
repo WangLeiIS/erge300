@@ -6,14 +6,15 @@ export const metadata: Metadata = {
   title: 'Card View',
 }
 
-interface PageProps {
-  params: {
-    bookCode: string
-  }
+interface PageParams {
+  params: Promise<{ bookCode: string }>
 }
 
-export default async function CardPage({ params }: PageProps) {
-  const { bookCode } = params
+export default async function CardPage({ params }: PageParams) {
+  // 等待解析动态路由参数
+  const { bookCode } = await params
+  
+  // 预加载书籍数据并等待结果
   const result = await fetchBooks()
   const book = result.books?.find(b => b.book_code === bookCode)
   
