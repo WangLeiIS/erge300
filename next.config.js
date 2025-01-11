@@ -1,7 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  // 其他配置项
+  images: {
+    domains: ['pic1.zhimg.com', 'pica.zhimg.com']
+  }
 };
 
 module.exports = nextConfig;

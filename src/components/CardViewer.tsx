@@ -8,28 +8,65 @@ import { Button } from '@/components/ui/button'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 
 interface CardViewerProps {
+  bookId: number
+  chapterId: number
   initialBookCode: string
+  onNextChapter?: () => void
+  onPreviousChapter?: () => void
+  isFirstChapter?: boolean
+  isLastChapter?: boolean
+  isBookFirstPage?: (cardNum: number) => boolean
+  isBookLastPage?: (cardNum: number, totalCards: number) => boolean
 }
 
-export default function CardViewer({ initialBookCode }: CardViewerProps) {
-  const [bookCode] = useState(initialBookCode)
+export default function CardViewer({ 
+  bookId, 
+  chapterId, 
+  initialBookCode, 
+  onNextChapter,
+  onPreviousChapter,
+  isFirstChapter,
+  isLastChapter,
+  isBookFirstPage,
+  isBookLastPage
+}: CardViewerProps) {
   const [cardNumber, setCardNumber] = useState(1)
+  const [totalCards, setTotalCards] = useState(0)
   const [card, setCard] = useState<{ card_context: string } | null>(null)
   const { toast } = useToast()
 
   const handleFetchCard = useCallback(async (direction: 'current' | 'next' | 'previous', num?: number) => {
     try {
       let newNum = num ?? cardNumber
-      if (direction === 'next') newNum++
-      if (direction === 'previous') newNum = Math.max(1, newNum - 1)
+      if (direction === 'next') {
+        if (cardNumber >= totalCards) {
+          onNextChapter?.()
+          return
+        }
+        newNum++
+      }
+      if (direction === 'previous') {
+        if (cardNumber <= 1) {
+          onPreviousChapter?.()
+          return
+        }
+        newNum = Math.max(1, newNum - 1)
+      }
 
-      const result = await fetchCard(bookCode, newNum)
+      const result = await fetchCard(bookId, chapterId, newNum)
       if (result.error) {
         throw new Error(result.error)
       }
-      setCard(result.card)
-      setCardNumber(newNum)
-      localStorage.setItem(`book_progress_${bookCode}`, newNum.toString())
+      
+      if (result.card) {
+        setCard(result.card)
+        setCardNumber(newNum)
+        setTotalCards(result.totalCards)
+        localStorage.setItem(`book_progress_${initialBookCode}`, JSON.stringify({
+          chapterId,
+          cardNum: newNum
+        }))
+      }
     } catch (error) {
       toast({
         title: 'Error',
@@ -37,20 +74,24 @@ export default function CardViewer({ initialBookCode }: CardViewerProps) {
         variant: 'destructive',
       })
     }
-  }, [bookCode, cardNumber, toast])
+  }, [bookId, chapterId, cardNumber, totalCards, initialBookCode, toast, onNextChapter, onPreviousChapter])
 
   useEffect(() => {
-    if (bookCode) {
-      const savedProgress = localStorage.getItem(`book_progress_${bookCode}`)
+    if (bookId && chapterId) {
+      const savedProgress = localStorage.getItem(`book_progress_${initialBookCode}`)
       if (savedProgress) {
-        const progress = parseInt(savedProgress)
-        setCardNumber(progress)
-        handleFetchCard('current', progress)
+        const progress = JSON.parse(savedProgress)
+        if (progress.chapterId === chapterId) {
+          setCardNumber(progress.cardNum)
+          handleFetchCard('current', progress.cardNum)
+        } else {
+          handleFetchCard('current', 1)
+        }
       } else {
         handleFetchCard('current', 1)
       }
     }
-  }, [bookCode, handleFetchCard])
+  }, [bookId, chapterId, initialBookCode, handleFetchCard])
 
   return (
     <div className="space-y-4">
@@ -64,15 +105,18 @@ export default function CardViewer({ initialBookCode }: CardViewerProps) {
         <Button
           variant="outline"
           onClick={() => handleFetchCard('previous')}
-          disabled={cardNumber <= 1}
+          disabled={isBookFirstPage?.(cardNumber) || (cardNumber <= 1 && isFirstChapter)}
         >
           <ChevronLeft className="h-4 w-4 mr-2" />
           上一页
         </Button>
-        <span className="text-sm text-muted-foreground">第 {cardNumber} 页</span>
+        <span className="text-sm text-muted-foreground">
+          第 {cardNumber} / {totalCards} 页
+        </span>
         <Button
           variant="outline"
           onClick={() => handleFetchCard('next')}
+          disabled={isBookLastPage?.(cardNumber, totalCards) || (cardNumber >= totalCards && isLastChapter)}
         >
           下一页
           <ChevronRight className="h-4 w-4 ml-2" />

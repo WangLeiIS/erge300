@@ -7,17 +7,14 @@ export const metadata: Metadata = {
 }
 
 export default async function CardPage({ params }: {
-  params: Promise<{ bookCode: string }>
+  params: { bookCode: string }
 }) {
-  // 等待解析动态路由参数
-  const { bookCode } = await params
-  
-  // 预加载书籍数据并等待结果
+  const { bookCode } = params
   const result = await fetchBooks()
   const book = result.books?.find(b => b.book_code === bookCode)
   
   if (!book) {
-    throw new Error('Book not found')
+    throw new Error(`Book not found for code: ${bookCode}`)
   }
   
   return (
