@@ -6,9 +6,13 @@ export const metadata: Metadata = {
   title: 'Card View',
 }
 
-export default async function CardPage({ params }: {
-  params: { bookCode: string }
-}) {
+interface PageProps {
+  params: {
+    bookCode: string
+  }
+}
+
+export default async function CardPage({ params }: PageProps) {
   const { bookCode } = params
   const result = await fetchBooks()
   const book = result.books?.find(b => b.book_code === bookCode)
