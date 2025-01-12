@@ -95,7 +95,7 @@ export async function fetchBooks() {
 
 export async function fetchChapters(bookId: number) {
   try {
-    const response = await fetch(`${API_URL}/api/v1/chapters`, {
+    const response = await fetch(`${API_URL}/api/v1/books/chapters`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

@@ -139,11 +139,11 @@ export default function CardPageClient({ bookCode, initialBook }: CardPageClient
               <Menu className="h-5 w-5" />
             </Button>
           </SheetTrigger>
-          <SheetContent side="left" className="w-[280px] sm:w-[340px]">
+          <SheetContent side="left" className="w-[280px] sm:w-[340px] overflow-hidden flex flex-col">
             <SheetHeader>
               <SheetTitle>{book.book_name}</SheetTitle>
             </SheetHeader>
-            <div className="mt-6">
+            <div className="mt-6 flex-1 overflow-y-auto scrollbar-hide">
               <ChapterList 
                 bookId={book.book_id} 
                 onChapterSelect={handleChapterSelect}

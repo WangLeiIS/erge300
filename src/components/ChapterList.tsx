@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react'
 import { useToast } from '@/hooks/use-toast'
 import { fetchChapters } from '@/app/action'
+import { SheetClose } from '@/components/ui/sheet'
+import { ChevronDown, ChevronRight } from 'lucide-react'
 
 interface Chapter {
   chapter_id: number
@@ -24,16 +26,38 @@ const ChapterItem = ({ chapter, level = 0, onSelect }: {
   level?: number
   onSelect?: (chapterId: number, chapterName: string) => void
 }) => {
+  const [isExpanded, setIsExpanded] = useState(true)
+  const hasSubchapters = chapter.subchapters?.length > 0
+
   return (
     <div className="w-full">
-      <div 
-        className={`flex items-center px-4 py-2 hover:bg-accent cursor-pointer`}
-        style={{ paddingLeft: `${level * 1.5 + 1}rem` }}
-        onClick={() => onSelect?.(chapter.chapter_id, chapter.chapter_name)}
-      >
-        <span className="text-sm">{chapter.chapter_name}</span>
+      <div className="flex items-center hover:bg-accent cursor-pointer">
+        {hasSubchapters && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              setIsExpanded(!isExpanded)
+            }}
+            className="p-1 hover:bg-accent/50 rounded"
+          >
+            {isExpanded ? (
+              <ChevronDown className="h-4 w-4" />
+            ) : (
+              <ChevronRight className="h-4 w-4" />
+            )}
+          </button>
+        )}
+        <SheetClose asChild>
+          <div 
+            className="flex-1 py-2 px-2"
+            style={{ paddingLeft: hasSubchapters ? '0.5rem' : `${level * 1.5 + 1}rem` }}
+            onClick={() => onSelect?.(chapter.chapter_id, chapter.chapter_name)}
+          >
+            <span className="text-sm">{chapter.chapter_name}</span>
+          </div>
+        </SheetClose>
       </div>
-      {chapter.subchapters?.length > 0 && (
+      {hasSubchapters && isExpanded && (
         <div className="w-full">
           {chapter.subchapters.map((subchapter) => (
             <ChapterItem
@@ -85,7 +109,7 @@ export default function ChapterList({ bookId, onChapterSelect, onInitialChapter,
   }, [bookId, toast, onInitialChapter])
 
   return (
-    <div className="w-full border rounded-lg overflow-hidden">
+    <div className="w-full border rounded-lg overflow-y-auto scrollbar-hide">
       {chapters.map((chapter) => (
         <ChapterItem
           key={chapter.chapter_id}
