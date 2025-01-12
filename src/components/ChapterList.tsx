@@ -88,12 +88,7 @@ export default function ChapterList({ bookId, onChapterSelect, onInitialChapter,
           throw new Error('No chapters data received')
         }
         setChapters(result.chapters)
-        
-        // 如果有章节数据，调用初始化回调
-        if (result.chapters.length > 0 && onInitialChapter) {
-          const firstChapter = result.chapters[0]
-          onInitialChapter(firstChapter.chapter_id, firstChapter.chapter_name)
-        }
+        onChaptersLoad?.(result.chapters)
       } catch (error) {
         toast({
           title: 'Error',
@@ -106,7 +101,7 @@ export default function ChapterList({ bookId, onChapterSelect, onInitialChapter,
     if (bookId) {
       getChapters()
     }
-  }, [bookId, toast, onInitialChapter])
+  }, [bookId, toast, onChaptersLoad])
 
   return (
     <div className="w-full border rounded-lg overflow-y-auto scrollbar-hide">

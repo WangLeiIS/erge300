@@ -12,6 +12,10 @@ import {
   SheetHeader,
   SheetTitle 
 } from '@/components/ui/sheet'
+import { useToast } from "@/hooks/use-toast"
+import { fetchChapters } from '@/app/action'
+import { useRouter } from 'next/navigation'
+import { getAuthToken } from '@/lib/auth'
 
 interface Book {
   book_id: number
@@ -31,6 +35,8 @@ interface CardPageClientProps {
 }
 
 export default function CardPageClient({ bookCode, initialBook }: CardPageClientProps) {
+  const { toast } = useToast()
+  const router = useRouter()
   const [book, setBook] = useState<Book | null>(null)
   const [currentChapter, setCurrentChapter] = useState<number | null>(null)
   const [chapterName, setChapterName] = useState<string>('')
@@ -81,15 +87,71 @@ export default function CardPageClient({ bookCode, initialBook }: CardPageClient
     return isLastChapter(chapterId) && cardNum >= totalCards
   }, [isLastChapter])
 
+  // 添加新的副作用来自动加载章节
   useEffect(() => {
-    setBook(initialBook)
-    const savedProgress = localStorage.getItem(`reading_progress_${bookCode}`)
-    if (savedProgress) {
-      const progress = JSON.parse(savedProgress)
-      setCurrentChapter(progress.chapterId)
-      setChapterName(progress.chapterName)
+    if (book?.book_id) {
+      const loadChapters = async () => {
+        try {
+          const result = await fetchChapters(book.book_id)
+          if (result.error) {
+            throw new Error(result.error)
+          }
+          if (!result.chapters) {
+            throw new Error('No chapters data received')
+          }
+          setChapters(result.chapters)
+          
+          // 如果没有当前章节，自动选择第一章
+          if (!currentChapter && result.chapters.length > 0) {
+            const firstChapter = result.chapters[0]
+            handleChapterSelect(firstChapter.chapter_id, firstChapter.chapter_name)
+          }
+        } catch (error) {
+          toast({
+            title: 'Error',
+            description: error instanceof Error ? error.message : 'Failed to fetch chapters',
+            variant: 'destructive',
+          })
+        }
+      }
+      
+      loadChapters()
     }
-  }, [initialBook, bookCode])
+  }, [book?.book_id, currentChapter])
+
+  useEffect(() => {
+    console.log('CardPageClient: Checking auth token')
+    const token = getAuthToken()
+    console.log('CardPageClient: Token exists:', !!token)
+    
+    if (!token) {
+      // 检查当前是否已经在登录页面，避免重复重定向
+      const currentPath = window.location.pathname
+      console.log('CardPageClient: Current path:', currentPath)
+      
+      if (currentPath !== '/auth') {
+        const redirectPath = `/card/${bookCode}`
+        console.log('CardPageClient: Setting redirect path:', redirectPath)
+        localStorage.setItem('redirect_after_login', redirectPath)
+        
+        toast({
+          title: 'Authentication Required',
+          description: 'Please login to read books',
+          variant: 'destructive',
+        })
+        router.push('/auth')
+      }
+      return
+    }
+    
+    console.log('CardPageClient: Setting book data')
+    setBook(initialBook)
+    localStorage.setItem('last_read_book', JSON.stringify({
+      bookCode,
+      bookName: initialBook.book_name,
+      timestamp: Date.now()
+    }))
+  }, [initialBook, bookCode, router, toast])
 
   const handleChapterSelect = useCallback((chapterId: number, name: string) => {
     setCurrentChapter(chapterId)
@@ -99,14 +161,6 @@ export default function CardPageClient({ bookCode, initialBook }: CardPageClient
       chapterName: name
     }))
   }, [bookCode])
-
-  const handleChaptersLoad = useCallback((loadedChapters: Chapter[]) => {
-    setChapters(loadedChapters)
-    if (loadedChapters.length > 0 && !currentChapter) {
-      const firstChapter = loadedChapters[0]
-      handleChapterSelect(firstChapter.chapter_id, firstChapter.chapter_name)
-    }
-  }, [currentChapter, handleChapterSelect])
 
   const handleNextChapter = useCallback(() => {
     if (!currentChapter) return
@@ -152,7 +206,6 @@ export default function CardPageClient({ bookCode, initialBook }: CardPageClient
                     handleChapterSelect(chapterId, name)
                   }
                 }}
-                onChaptersLoad={handleChaptersLoad}
               />
             </div>
           </SheetContent>

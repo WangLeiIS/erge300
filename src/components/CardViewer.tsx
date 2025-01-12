@@ -1,11 +1,15 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { useToast } from '@/hooks/use-toast'
-import { fetchCard } from '@/app/action'
-import { Card } from '@/components/ui/card'
+import { fetchCard, checkCardMark, toggleCardMark } from '@/app/action'
+import { Card as UICard } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Heart } from 'lucide-react'
+import { cn } from '@/lib/utils'
+import { getAuthToken, clearAuth, getUserId } from '@/lib/auth'
+import { Card as CardInterface } from '@/app/action'
 
 interface CardViewerProps {
   bookId: number
@@ -32,8 +36,10 @@ export default function CardViewer({
 }: CardViewerProps) {
   const [cardNumber, setCardNumber] = useState(1)
   const [totalCards, setTotalCards] = useState(0)
-  const [card, setCard] = useState<{ card_context: string } | null>(null)
+  const [card, setCard] = useState<CardInterface | null>(null)
   const { toast } = useToast()
+  const [isMarked, setIsMarked] = useState(false)
+  const router = useRouter()
 
   const handleFetchCard = useCallback(async (direction: 'current' | 'next' | 'previous', num?: number) => {
     try {
@@ -93,13 +99,101 @@ export default function CardViewer({
     }
   }, [bookId, chapterId, initialBookCode, handleFetchCard])
 
+  const handleMarkToggle = async () => {
+    const token = getAuthToken()
+    const userId = getUserId()
+    if (!token || !userId || !card) {
+      toast({
+        title: 'Error',
+        description: 'Please login to bookmark cards',
+        variant: 'destructive',
+      })
+      router.push('/auth')
+      return
+    }
+    
+    try {
+      const result = await toggleCardMark(card.card_id, token, userId, isMarked)
+      if (result.error) {
+        if (result.error === 'Invalid token') {
+          console.log('CardViewer: Clearing auth due to invalid token')
+          localStorage.setItem('redirect_after_login', window.location.pathname)
+          clearAuth()
+          router.push('/auth')
+          return
+        }
+        throw new Error(result.error)
+      }
+      setIsMarked(!isMarked)
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to toggle bookmark',
+        variant: 'destructive',
+      })
+    }
+  }
+
+  useEffect(() => {
+    if (card?.card_id) {
+      const token = getAuthToken()
+      const userId = getUserId()
+      
+      if (!token || !userId) {
+        setIsMarked(false)
+        return
+      }
+
+      const checkMark = async () => {
+        try {
+          const result = await checkCardMark(card.card_id, token, userId)
+          console.log('CardViewer: Check mark result:', result)
+          
+          if (result.error) {
+            console.error('Mark check error:', result.error)
+            if (result.error === 'Invalid token') {
+              console.log('CardViewer: Clearing auth due to invalid token')
+              clearAuth()
+              setIsMarked(false)
+              return
+            }
+            setIsMarked(false)
+            return
+          }
+          setIsMarked(result.isMarked ?? false)
+        } catch (error) {
+          console.error('Failed to check mark status:', error)
+          setIsMarked(false)
+        }
+      }
+      checkMark()
+    }
+  }, [card?.card_id])
+
   return (
     <div className="space-y-4">
-      <Card className="min-h-[60vh] p-6 flex items-center justify-center">
-        <p className="text-center text-lg whitespace-pre-wrap">
-          {card?.card_context || '暂无内容'}
-        </p>
-      </Card>
+      <UICard className="min-h-[60vh] p-6 flex flex-col">
+        <div className="flex justify-end mb-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleMarkToggle}
+            className="hover:bg-accent"
+          >
+            <Heart 
+              className={cn(
+                "h-5 w-5 transition-colors",
+                isMarked ? "fill-current text-red-500" : "text-muted-foreground"
+              )} 
+            />
+          </Button>
+        </div>
+        <div className="flex-1 flex items-center justify-center">
+          <p className="text-center text-lg whitespace-pre-wrap">
+            {card?.card_context || '暂无内容'}
+          </p>
+        </div>
+      </UICard>
       
       <div className="flex justify-between items-center">
         <Button
