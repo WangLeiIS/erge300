@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter, usePathname } from 'next/navigation'
-import { Library, Book, User } from 'lucide-react'
+import { Library, Book, Heart } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useEffect, useState, useCallback } from 'react'
 import { getUsername } from '@/lib/auth'
@@ -13,13 +13,11 @@ export default function BottomNav() {
   const pathname = usePathname()
   const [username, setUsername] = useState<string | null>(null)
 
-  // 统一的路径判断逻辑
   const isHomePage = pathname === '/'
   const isCardPage = pathname.includes('/card/')
-  const isProfilePage = pathname === '/profile'
+  const isMarksPage = pathname === '/profile/marks'
   const bookCode = isCardPage ? pathname.split('/').pop() : null
 
-  // 优化用户状态管理
   useEffect(() => {
     const currentUsername = getUsername()
     if (username !== currentUsername) {
@@ -35,24 +33,25 @@ export default function BottomNav() {
   // 优化书籍按钮点击逻辑
   const handleBookClick = useCallback(() => {
     if (isCardPage && bookCode) {
-      // 如果当前在阅读页面，刷新当前页面
       router.push(`/card/${bookCode}`)
     } else {
-      // 获取最后阅读的书籍信息
       const lastReadBook = localStorage.getItem('last_read_book')
       if (lastReadBook) {
         const { bookCode } = JSON.parse(lastReadBook)
         router.push(`/card/${bookCode}`)
       } else {
-        // 如果没有阅读记录，跳转到首页
         router.push('/')
       }
     }
   }, [isCardPage, bookCode, router])
 
-  // 优化用户按钮点击逻辑
-  const handleProfileClick = useCallback(() => {
-    router.push(username ? '/profile' : '/auth')
+  // 处理标记按钮点击
+  const handleMarksClick = useCallback(() => {
+    if (!username) {
+      router.push('/auth')
+      return
+    }
+    router.push('/profile/marks')
   }, [router, username])
 
   return (
@@ -71,12 +70,12 @@ export default function BottomNav() {
       >
         <Book className="h-6 w-6" />
       </Button>
-      <Button
-        variant={getButtonVariant(isProfilePage)}
+      <Button 
+        variant={getButtonVariant(isMarksPage)}
         className="flex flex-col items-center gap-1"
-        onClick={handleProfileClick}
+        onClick={handleMarksClick}
       >
-        <User className="h-6 w-6" />
+        <Heart className="h-6 w-6" />
       </Button>
     </nav>
   )

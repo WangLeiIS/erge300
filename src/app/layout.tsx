@@ -4,6 +4,7 @@ import { Toaster } from '@/components/ui/toaster'
 import BottomNav from '@/components/BottomNav'
 import { ThemeProvider } from "@/components/ThemeProvider"
 import { ThemeToggle } from "@/components/ThemeToggle"
+import TopNav from '@/components/TopNav'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -27,13 +28,11 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <div className="relative min-h-screen">
-            <div className="fixed top-4 right-4 z-50">
-              <ThemeToggle />
-            </div>
+          <TopNav />
+          <div className="pt-[60px] pb-[72px] min-h-screen">
             {children}
-            <BottomNav />
           </div>
+          <BottomNav />
           <Toaster />
         </ThemeProvider>
       </body>

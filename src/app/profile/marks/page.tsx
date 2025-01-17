@@ -1,10 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { ChevronLeft, Eye } from 'lucide-react'
+import { Eye, ChevronDown, ChevronUp } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { getAuthToken, getUserId, clearAuth } from '@/lib/auth'
 import { fetchMarkedCards, toggleCardMark, type MarkedCard } from '@/app/action'
@@ -13,6 +12,8 @@ import { Heart } from 'lucide-react'
 export default function MarkedCardsPage() {
   const [markedCards, setMarkedCards] = useState<MarkedCard[]>([])
   const [loading, setLoading] = useState(true)
+  const [expandedCards, setExpandedCards] = useState<Set<number>>(new Set())
+  const [overflowingCards, setOverflowingCards] = useState<Set<number>>(new Set())
   const router = useRouter()
   const { toast } = useToast()
 
@@ -58,36 +59,59 @@ export default function MarkedCardsPage() {
     return new Date(dateString).toLocaleDateString()
   }
 
+  const checkTextOverflow = (element: HTMLElement) => {
+    return element.scrollHeight > element.clientHeight
+  }
+
+  useEffect(() => {
+    const checkOverflow = () => {
+      const newOverflowingCards = new Set<number>()
+      document.querySelectorAll('[data-card-text]').forEach((element) => {
+        const cardId = Number(element.getAttribute('data-card-id'))
+        if (checkTextOverflow(element as HTMLElement)) {
+          newOverflowingCards.add(cardId)
+        }
+      })
+      setOverflowingCards(newOverflowingCards)
+    }
+
+    checkOverflow()
+    window.addEventListener('resize', checkOverflow)
+    return () => window.removeEventListener('resize', checkOverflow)
+  }, [markedCards])
+
+  const toggleExpand = (cardId: number) => {
+    setExpandedCards(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(cardId)) {
+        newSet.delete(cardId)
+      } else {
+        newSet.add(cardId)
+      }
+      return newSet
+    })
+  }
+
   if (loading) {
     return <div className="container mx-auto p-4">Loading...</div>
   }
 
   return (
-    <div className="container mx-auto p-4 pb-20">
-      <div className="flex items-center mb-6 sticky top-0 bg-background z-10">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => router.back()}
-          className="mr-2"
-        >
-          <ChevronLeft className="h-5 w-5" />
-        </Button>
-        <h1 className="text-2xl font-bold">我的标记</h1>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 overflow-y-auto">
+    <div className="container mx-auto px-4">
+      <div className="max-w-2xl mx-auto divide-y">
         {markedCards.length === 0 ? (
-          <div className="col-span-full p-6 text-center text-muted-foreground">
+          <div className="py-6 text-center text-muted-foreground">
             暂无标记内容
           </div>
         ) : (
-          markedCards.map((card) => (
-            <Card key={card.card_id} className="relative">
-              <CardContent className="p-4 h-[200px] flex flex-col">
+          markedCards.map((card) => {
+            const isExpanded = expandedCards.has(card.card_id)
+            const hasOverflow = overflowingCards.has(card.card_id)
+            return (
+              <div key={card.card_id} className="py-4">
                 <div className="flex justify-between items-start mb-2">
                   <div>
-                    <p className="font-medium text-lg">
+                    <p className="font-medium">
                       {card.book_name}
                       <span className="text-sm text-muted-foreground ml-2">
                         {card.chapter_name} · {card.card_num}
@@ -99,20 +123,44 @@ export default function MarkedCardsPage() {
                   </span>
                 </div>
                 
-                <p className="text-sm mb-2 line-clamp-3">{card.card_context}</p>
+                <p 
+                  className={`text-sm mb-2 ${isExpanded ? '' : 'line-clamp-4'}`}
+                  data-card-text
+                  data-card-id={card.card_id}
+                >
+                  {card.card_context}
+                </p>
                 
                 <div className="flex justify-between items-center">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-sm hover:bg-accent"
-                    onClick={() => router.push(`/card/${card.book_code}`)}
-                  >
-                    <Eye className="h-4 w-4 mr-2" />
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-sm hover:bg-accent px-2 h-8"
+                      onClick={() => router.push(`/card/${card.book_code}`)}
+                    >
+                      <Eye className="h-4 w-4 mr-1" />
+                    </Button>
+                    {hasOverflow && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-sm hover:bg-accent px-2 h-8"
+                        onClick={() => toggleExpand(card.card_id)}
+                      >
+                        {isExpanded ? (
+                          <ChevronUp className="h-4 w-4 mr-1" />
+                        ) : (
+                          <ChevronDown className="h-4 w-4 mr-1" />
+                        )}
+                        {isExpanded ? '收起' : '展开'}
+                      </Button>
+                    )}
+                  </div>
                   <Button
                     variant="ghost"
                     size="icon"
+                    className="h-8 w-8"
                     onClick={async (e) => {
                       e.stopPropagation();
                       const token = getAuthToken();
@@ -136,9 +184,9 @@ export default function MarkedCardsPage() {
                     <Heart className="h-4 w-4 fill-current text-red-500" />
                   </Button>
                 </div>
-              </CardContent>
-            </Card>
-          ))
+              </div>
+            )
+          })
         )}
       </div>
     </div>
