@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/hooks/use-toast'
 import { fetchCard, checkCardMark, toggleCardMark } from '@/app/action'
@@ -41,66 +41,86 @@ export default function CardViewer({
   const { toast } = useToast()
   const [isMarked, setIsMarked] = useState(false)
   const router = useRouter()
+  
+  // 使用 ref 来缓存章节内容
+  const chaptersCache = useRef<Record<number, CardInterface[]>>({})
 
-  const handleFetchCards = useCallback(async () => {
+  const fetchChapterCards = useCallback(async (targetChapterId: number) => {
     try {
-      console.log('Fetching cards for chapter:', currentChapterId)
-      const result = await fetchCard(bookId, currentChapterId)
+      // 如果缓存中已有该章节内容，直接返回
+      if (chaptersCache.current[targetChapterId]) {
+        return { cards: chaptersCache.current[targetChapterId] }
+      }
+
+      const result = await fetchCard(bookId, targetChapterId)
       if (result.error) {
         throw new Error(result.error)
       }
       
       if (result.cards) {
-        setCards(result.cards)
-        // 保存进度
-        localStorage.setItem(`book_progress_${initialBookCode}`, JSON.stringify({
-          chapterId: currentChapterId,
-          cardNum: 1  // 新章节总是从第一页开始
-        }))
+        // 将结果存入缓存
+        chaptersCache.current[targetChapterId] = result.cards
       }
+      return result
     } catch (error) {
+      return { error: error instanceof Error ? error.message : 'An error occurred' }
+    }
+  }, [bookId])
+
+  // 预加载下一章和上一章的内容
+  const preloadAdjacentChapters = useCallback(async () => {
+    const nextChapterId = currentChapterId + 1
+    const prevChapterId = currentChapterId - 1
+
+    if (!isLastChapter) {
+      fetchChapterCards(nextChapterId)
+    }
+    if (!isFirstChapter) {
+      fetchChapterCards(prevChapterId)
+    }
+  }, [currentChapterId, fetchChapterCards, isFirstChapter, isLastChapter])
+
+  // 处理章节切换
+  const handleChapterChange = useCallback(async (newChapterId: number) => {
+    // 如果缓存中有内容，立即更新UI
+    if (chaptersCache.current[newChapterId]) {
+      setCards(chaptersCache.current[newChapterId])
+      setCurrentChapterId(newChapterId)
+      setCardNumber(1)
+      return
+    }
+
+    // 否则加载新内容
+    setCards([]) // 显示加载状态
+    const result = await fetchChapterCards(newChapterId)
+    if (result.error) {
       toast({
         title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to fetch cards',
+        description: result.error,
         variant: 'destructive',
       })
+      return
     }
-  }, [bookId, currentChapterId, initialBookCode, toast]) // 移除 cardNumber 依赖
+
+    if (result.cards) {
+      setCards(result.cards)
+      setCurrentChapterId(newChapterId)
+      setCardNumber(1)
+      localStorage.setItem(`book_progress_${initialBookCode}`, JSON.stringify({
+        chapterId: newChapterId,
+        cardNum: 1
+      }))
+    }
+  }, [fetchChapterCards, initialBookCode, toast])
 
   // 监听章节ID的变化
   useEffect(() => {
     if (chapterId !== currentChapterId) {
-      console.log('Chapter changed from', currentChapterId, 'to', chapterId)
-      setCurrentChapterId(chapterId)
-      setCardNumber(1)
-      setCards([])
-      // 立即获取新章节的内容
-      const fetchNewChapterCards = async () => {
-        try {
-          const result = await fetchCard(bookId, chapterId)
-          if (result.error) {
-            throw new Error(result.error)
-          }
-          if (result.cards) {
-            setCards(result.cards)
-            localStorage.setItem(`book_progress_${initialBookCode}`, JSON.stringify({
-              chapterId: chapterId,
-              cardNum: 1
-            }))
-          }
-        } catch (error) {
-          toast({
-            title: 'Error',
-            description: error instanceof Error ? error.message : 'Failed to fetch cards',
-            variant: 'destructive',
-          })
-        }
-      }
-      fetchNewChapterCards()
+      handleChapterChange(chapterId)
     }
-  }, [chapterId, currentChapterId, bookId, initialBookCode, toast])
+  }, [chapterId, currentChapterId, handleChapterChange])
 
-  // 初始加载时获取卡片内容
+  // 初始加载和预加载
   useEffect(() => {
     if (bookId && currentChapterId) {
       const savedProgress = localStorage.getItem(`book_progress_${initialBookCode}`)
@@ -108,13 +128,15 @@ export default function CardViewer({
         const progress = JSON.parse(savedProgress)
         if (progress.chapterId === currentChapterId) {
           setCardNumber(progress.cardNum)
-        } else {
-          setCardNumber(1)
         }
       }
-      handleFetchCards()
+      
+      // 初始加载当前章节
+      handleChapterChange(currentChapterId)
+      // 预加载相邻章节
+      preloadAdjacentChapters()
     }
-  }, [bookId, currentChapterId, initialBookCode, handleFetchCards])
+  }, [bookId, currentChapterId, initialBookCode, handleChapterChange, preloadAdjacentChapters])
 
   const handleCardChange = (direction: 'next' | 'previous') => {
     if (direction === 'next') {
