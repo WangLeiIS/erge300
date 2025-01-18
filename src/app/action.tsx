@@ -72,19 +72,16 @@ export async function fetchCard(bookId: number, chapterId: number, num: number) 
     }
 
     const data: Card[] = await response.json()
-    // 根据 card_num 找到对应的卡片
     const card = data.find(c => c.card_num === num)
     
-    if (card) {
-      return { 
-        card,
-        totalCards: data.length
-      }
-    } else {
-      return { error: 'No card found' }
-    }
+    return card 
+      ? { card, totalCards: data.length }
+      : { error: 'No card found' }
+      
   } catch (error) {
-    return { error: error instanceof Error ? error.message : 'An error occurred' }
+    return { 
+      error: error instanceof Error ? error.message : 'An error occurred'
+    }
   }
 }
 
