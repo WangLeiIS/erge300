@@ -42,16 +42,9 @@ export default function CardViewer({
   const [isMarked, setIsMarked] = useState(false)
   const router = useRouter()
 
-  useEffect(() => {
-    if (chapterId !== currentChapterId) {
-      setCurrentChapterId(chapterId)
-      setCardNumber(1)
-      setCards([])
-    }
-  }, [chapterId, currentChapterId])
-
   const handleFetchCards = useCallback(async () => {
     try {
+      console.log('Fetching cards for chapter:', currentChapterId)
       const result = await fetchCard(bookId, currentChapterId)
       if (result.error) {
         throw new Error(result.error)
@@ -62,7 +55,7 @@ export default function CardViewer({
         // 保存进度
         localStorage.setItem(`book_progress_${initialBookCode}`, JSON.stringify({
           chapterId: currentChapterId,
-          cardNum: cardNumber
+          cardNum: 1  // 新章节总是从第一页开始
         }))
       }
     } catch (error) {
@@ -72,8 +65,42 @@ export default function CardViewer({
         variant: 'destructive',
       })
     }
-  }, [bookId, currentChapterId, cardNumber, initialBookCode, toast])
+  }, [bookId, currentChapterId, initialBookCode, toast]) // 移除 cardNumber 依赖
 
+  // 监听章节ID的变化
+  useEffect(() => {
+    if (chapterId !== currentChapterId) {
+      console.log('Chapter changed from', currentChapterId, 'to', chapterId)
+      setCurrentChapterId(chapterId)
+      setCardNumber(1)
+      setCards([])
+      // 立即获取新章节的内容
+      const fetchNewChapterCards = async () => {
+        try {
+          const result = await fetchCard(bookId, chapterId)
+          if (result.error) {
+            throw new Error(result.error)
+          }
+          if (result.cards) {
+            setCards(result.cards)
+            localStorage.setItem(`book_progress_${initialBookCode}`, JSON.stringify({
+              chapterId: chapterId,
+              cardNum: 1
+            }))
+          }
+        } catch (error) {
+          toast({
+            title: 'Error',
+            description: error instanceof Error ? error.message : 'Failed to fetch cards',
+            variant: 'destructive',
+          })
+        }
+      }
+      fetchNewChapterCards()
+    }
+  }, [chapterId, currentChapterId, bookId, initialBookCode, toast])
+
+  // 初始加载时获取卡片内容
   useEffect(() => {
     if (bookId && currentChapterId) {
       const savedProgress = localStorage.getItem(`book_progress_${initialBookCode}`)
