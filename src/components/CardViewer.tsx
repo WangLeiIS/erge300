@@ -10,6 +10,7 @@ import { Heart, CornerDownLeft } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { getAuthToken, clearAuth, getUserId } from '@/lib/auth'
 import { Card as CardInterface } from '@/app/action'
+import { Slider } from "@/components/ui/slider"
 
 interface CardViewerProps {
   bookId: number
@@ -35,52 +36,55 @@ export default function CardViewer({
   isBookLastPage
 }: CardViewerProps) {
   const [cardNumber, setCardNumber] = useState(1)
-  const [totalCards, setTotalCards] = useState(0)
-  const [card, setCard] = useState<CardInterface | null>(null)
+  const [cards, setCards] = useState<CardInterface[]>([])
   const { toast } = useToast()
   const [isMarked, setIsMarked] = useState(false)
   const router = useRouter()
 
-  const handleFetchCard = useCallback(async (direction: 'current' | 'next' | 'previous', num?: number) => {
+  const handleFetchCards = useCallback(async () => {
     try {
-      let newNum = num ?? cardNumber
-      if (direction === 'next') {
-        if (cardNumber >= totalCards) {
-          onNextChapter?.()
-          return
-        }
-        newNum++
-      }
-      if (direction === 'previous') {
-        if (cardNumber <= 1) {
-          onPreviousChapter?.()
-          return
-        }
-        newNum = Math.max(1, newNum - 1)
-      }
-
-      const result = await fetchCard(bookId, chapterId, newNum)
+      const result = await fetchCard(bookId, chapterId)
       if (result.error) {
         throw new Error(result.error)
       }
       
-      if (result.card) {
-        setCard(result.card)
-        setCardNumber(newNum)
-        setTotalCards(result.totalCards)
+      if (result.cards) {
+        setCards(result.cards)
+        // 保存进度
         localStorage.setItem(`book_progress_${initialBookCode}`, JSON.stringify({
           chapterId,
-          cardNum: newNum
+          cardNum: cardNumber
         }))
       }
     } catch (error) {
       toast({
         title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to fetch card',
+        description: error instanceof Error ? error.message : 'Failed to fetch cards',
         variant: 'destructive',
       })
     }
-  }, [bookId, chapterId, cardNumber, totalCards, initialBookCode, toast, onNextChapter, onPreviousChapter])
+  }, [bookId, chapterId, cardNumber, initialBookCode, toast])
+
+  const handleCardChange = (direction: 'next' | 'previous') => {
+    if (direction === 'next') {
+      if (cardNumber >= cards.length) {
+        onNextChapter?.()
+        return
+      }
+      setCardNumber(prev => prev + 1)
+    } else {
+      if (cardNumber <= 1) {
+        onPreviousChapter?.()
+        return
+      }
+      setCardNumber(prev => Math.max(1, prev - 1))
+    }
+    
+    localStorage.setItem(`book_progress_${initialBookCode}`, JSON.stringify({
+      chapterId,
+      cardNum: direction === 'next' ? cardNumber + 1 : cardNumber - 1
+    }))
+  }
 
   useEffect(() => {
     if (bookId && chapterId) {
@@ -89,20 +93,18 @@ export default function CardViewer({
         const progress = JSON.parse(savedProgress)
         if (progress.chapterId === chapterId) {
           setCardNumber(progress.cardNum)
-          handleFetchCard('current', progress.cardNum)
         } else {
-          handleFetchCard('current', 1)
+          setCardNumber(1)
         }
-      } else {
-        handleFetchCard('current', 1)
       }
+      handleFetchCards()
     }
-  }, [bookId, chapterId, initialBookCode, handleFetchCard])
+  }, [bookId, chapterId, initialBookCode, handleFetchCards])
 
   const handleMarkToggle = async () => {
     const token = getAuthToken()
     const userId = getUserId()
-    if (!token || !userId || !card) {
+    if (!token || !userId || !cards[cardNumber - 1]) {
       toast({
         title: 'Error',
         description: 'Please login to bookmark cards',
@@ -113,7 +115,7 @@ export default function CardViewer({
     }
     
     try {
-      const result = await toggleCardMark(card.card_id, token, userId, isMarked)
+      const result = await toggleCardMark(cards[cardNumber - 1].card_id, token, userId, isMarked)
       if (result.error) {
         if (result.error === 'Invalid token') {
           console.log('CardViewer: Clearing auth due to invalid token')
@@ -135,7 +137,7 @@ export default function CardViewer({
   }
 
   useEffect(() => {
-    if (card?.card_id) {
+    if (cards[cardNumber - 1]?.card_id) {
       const token = getAuthToken()
       const userId = getUserId()
       
@@ -146,7 +148,7 @@ export default function CardViewer({
 
       const checkMark = async () => {
         try {
-          const result = await checkCardMark(card.card_id, token, userId)
+          const result = await checkCardMark(cards[cardNumber - 1].card_id, token, userId)
           console.log('CardViewer: Check mark result:', result)
           
           if (result.error) {
@@ -168,12 +170,17 @@ export default function CardViewer({
       }
       checkMark()
     }
-  }, [card?.card_id])
+  }, [cards[cardNumber - 1]?.card_id])
 
-  const handleCardClick = () => {
-    if (!isBookLastPage?.(cardNumber, totalCards) && !(cardNumber >= totalCards && isLastChapter)) {
-      handleFetchCard('next')
-    }
+  const currentCard = cards[cardNumber - 1]
+
+  const handleSliderChange = (value: number[]) => {
+    const newCardNumber = value[0]
+    setCardNumber(newCardNumber)
+    localStorage.setItem(`book_progress_${initialBookCode}`, JSON.stringify({
+      chapterId,
+      cardNum: newCardNumber
+    }))
   }
 
   return (
@@ -183,7 +190,7 @@ export default function CardViewer({
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => handleFetchCard('previous')}
+            onClick={() => handleCardChange('previous')}
             disabled={isBookFirstPage?.(cardNumber) || (cardNumber <= 1 && isFirstChapter)}
             className="hover:bg-accent"
           >
@@ -206,22 +213,33 @@ export default function CardViewer({
         
         <div 
           className="flex-1 flex items-center justify-center cursor-pointer min-h-[40vh]"
-          onClick={handleCardClick}
+          onClick={() => !isBookLastPage?.(cardNumber, cards.length) && handleCardChange('next')}
         >
           <div 
             className="text-center text-lg prose prose-sm max-w-none"
             dangerouslySetInnerHTML={{ 
-              __html: card?.card_context || '暂无内容'
+              __html: currentCard?.card_context || '暂无内容'
             }}
           />
         </div>
 
         <div className="absolute bottom-4 right-6">
           <span className="text-sm text-muted-foreground">
-            {cardNumber} / {totalCards}
+            {cardNumber} / {cards.length}
           </span>
         </div>
       </UICard>
+      
+      <div className="px-2">
+        <Slider
+          value={[cardNumber]}
+          min={1}
+          max={cards.length || 1}
+          step={1}
+          onValueChange={handleSliderChange}
+          className="w-full"
+        />
+      </div>
     </div>
   )
 }

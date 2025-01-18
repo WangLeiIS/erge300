@@ -26,7 +26,7 @@ const ChapterItem = ({ chapter, level = 0, onSelect }: {
   level?: number
   onSelect?: (chapterId: number, chapterName: string) => void
 }) => {
-  const [isExpanded, setIsExpanded] = useState(true)
+  const [isExpanded, setIsExpanded] = useState(false)
   const hasSubchapters = chapter.subchapters?.length > 0
 
   return (

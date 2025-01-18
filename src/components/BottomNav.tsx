@@ -55,28 +55,30 @@ export default function BottomNav() {
   }, [router, username])
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 flex justify-around p-4 bg-background border-t">
-      <Button 
-        variant={getButtonVariant(isHomePage)}
-        className="flex flex-col items-center gap-1"
-        onClick={() => router.push('/')}
-      >
-        <Library className="h-6 w-6" />
-      </Button>
-      <Button 
-        variant={getButtonVariant(isCardPage)}
-        className="flex flex-col items-center gap-1"
-        onClick={handleBookClick}
-      >
-        <Book className="h-6 w-6" />
-      </Button>
-      <Button 
-        variant={getButtonVariant(isMarksPage)}
-        className="flex flex-col items-center gap-1"
-        onClick={handleMarksClick}
-      >
-        <Heart className="h-6 w-6" />
-      </Button>
+    <nav className="fixed bottom-0 left-0 right-0 bg-background border-t">
+      <div className="container mx-auto max-w-6xl flex justify-around p-4">
+        <Button 
+          variant={getButtonVariant(isHomePage)}
+          className="flex flex-col items-center gap-1"
+          onClick={() => router.push('/')}
+        >
+          <Library className="h-6 w-6" />
+        </Button>
+        <Button 
+          variant={getButtonVariant(isCardPage)}
+          className="flex flex-col items-center gap-1"
+          onClick={handleBookClick}
+        >
+          <Book className="h-6 w-6" />
+        </Button>
+        <Button 
+          variant={getButtonVariant(isMarksPage)}
+          className="flex flex-col items-center gap-1"
+          onClick={handleMarksClick}
+        >
+          <Heart className="h-6 w-6" />
+        </Button>
+      </div>
     </nav>
   )
 }

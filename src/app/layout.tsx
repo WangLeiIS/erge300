@@ -3,14 +3,13 @@ import { Inter } from 'next/font/google'
 import { Toaster } from '@/components/ui/toaster'
 import BottomNav from '@/components/BottomNav'
 import { ThemeProvider } from "@/components/ThemeProvider"
-import { ThemeToggle } from "@/components/ThemeToggle"
 import TopNav from '@/components/TopNav'
 
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata = {
-  title: 'Card Viewer',
-  description: 'View cards from books',
+  title: '悠卡阅读',
+  description: '悠卡阅读 read.yoga',
 }
 
 export default function RootLayout({

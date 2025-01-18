@@ -185,11 +185,11 @@ export default function CardPageClient({ bookCode, initialBook }: CardPageClient
   }
 
   return (
-    <main className="container mx-auto p-4">
+    <main className="container mx-auto max-w-6xl p-4">
       <div className="flex items-center mb-2">
         <Sheet>
           <SheetTrigger asChild>
-            <Button variant="ghost" size="icon" className="absolute left-4">
+            <Button variant="ghost" size="icon">
               <Menu className="h-5 w-5" />
             </Button>
           </SheetTrigger>
