@@ -6,7 +6,7 @@ import { useToast } from '@/hooks/use-toast'
 import { fetchCard, checkCardMark, toggleCardMark } from '@/app/action'
 import { Card as UICard } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { ChevronLeft, ChevronRight, Heart } from 'lucide-react'
+import { Heart, CornerDownLeft } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { getAuthToken, clearAuth, getUserId } from '@/lib/auth'
 import { Card as CardInterface } from '@/app/action'
@@ -170,10 +170,25 @@ export default function CardViewer({
     }
   }, [card?.card_id])
 
+  const handleCardClick = () => {
+    if (!isBookLastPage?.(cardNumber, totalCards) && !(cardNumber >= totalCards && isLastChapter)) {
+      handleFetchCard('next')
+    }
+  }
+
   return (
     <div className="space-y-4">
-      <UICard className="min-h-[60vh] p-6 flex flex-col">
-        <div className="flex justify-end mb-4">
+      <UICard className="min-h-[60vh] p-6 relative">
+        <div className="flex justify-between mb-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => handleFetchCard('previous')}
+            disabled={isBookFirstPage?.(cardNumber) || (cardNumber <= 1 && isFirstChapter)}
+            className="hover:bg-accent"
+          >
+            <CornerDownLeft className="h-5 w-5" />
+          </Button>
           <Button
             variant="ghost"
             size="icon"
@@ -188,34 +203,25 @@ export default function CardViewer({
             />
           </Button>
         </div>
-        <div className="flex-1 flex items-center justify-center">
-          <p className="text-center text-lg whitespace-pre-wrap">
-            {card?.card_context || '暂无内容'}
-          </p>
+        
+        <div 
+          className="flex-1 flex items-center justify-center cursor-pointer min-h-[40vh]"
+          onClick={handleCardClick}
+        >
+          <div 
+            className="text-center text-lg prose prose-sm max-w-none"
+            dangerouslySetInnerHTML={{ 
+              __html: card?.card_context || '暂无内容'
+            }}
+          />
+        </div>
+
+        <div className="absolute bottom-4 right-6">
+          <span className="text-sm text-muted-foreground">
+            {cardNumber} / {totalCards}
+          </span>
         </div>
       </UICard>
-      
-      <div className="flex justify-between items-center">
-        <Button
-          variant="outline"
-          onClick={() => handleFetchCard('previous')}
-          disabled={isBookFirstPage?.(cardNumber) || (cardNumber <= 1 && isFirstChapter)}
-        >
-          <ChevronLeft className="h-4 w-4 mr-2" />
-          上一页
-        </Button>
-        <span className="text-sm text-muted-foreground">
-          第 {cardNumber} / {totalCards} 页
-        </span>
-        <Button
-          variant="outline"
-          onClick={() => handleFetchCard('next')}
-          disabled={isBookLastPage?.(cardNumber, totalCards) || (cardNumber >= totalCards && isLastChapter)}
-        >
-          下一页
-          <ChevronRight className="h-4 w-4 ml-2" />
-        </Button>
-      </div>
     </div>
   )
 }

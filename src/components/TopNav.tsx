@@ -27,7 +27,7 @@ export default function TopNav() {
   return (
     <nav className="fixed top-0 left-0 right-0 flex justify-between items-center p-4 bg-background border-b">
       <div className="flex items-center">
-        <h1 className="text-xl font-bold">Read.yoga</h1>
+        <h1 className="text-xl font-bold">Read.Yoga</h1>
       </div>
       <div className="flex items-center gap-4">
         <ThemeToggle />
