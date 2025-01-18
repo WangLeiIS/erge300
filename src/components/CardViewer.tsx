@@ -37,13 +37,22 @@ export default function CardViewer({
 }: CardViewerProps) {
   const [cardNumber, setCardNumber] = useState(1)
   const [cards, setCards] = useState<CardInterface[]>([])
+  const [currentChapterId, setCurrentChapterId] = useState(chapterId)
   const { toast } = useToast()
   const [isMarked, setIsMarked] = useState(false)
   const router = useRouter()
 
+  useEffect(() => {
+    if (chapterId !== currentChapterId) {
+      setCurrentChapterId(chapterId)
+      setCardNumber(1)
+      setCards([])
+    }
+  }, [chapterId, currentChapterId])
+
   const handleFetchCards = useCallback(async () => {
     try {
-      const result = await fetchCard(bookId, chapterId)
+      const result = await fetchCard(bookId, currentChapterId)
       if (result.error) {
         throw new Error(result.error)
       }
@@ -52,7 +61,7 @@ export default function CardViewer({
         setCards(result.cards)
         // 保存进度
         localStorage.setItem(`book_progress_${initialBookCode}`, JSON.stringify({
-          chapterId,
+          chapterId: currentChapterId,
           cardNum: cardNumber
         }))
       }
@@ -63,7 +72,22 @@ export default function CardViewer({
         variant: 'destructive',
       })
     }
-  }, [bookId, chapterId, cardNumber, initialBookCode, toast])
+  }, [bookId, currentChapterId, cardNumber, initialBookCode, toast])
+
+  useEffect(() => {
+    if (bookId && currentChapterId) {
+      const savedProgress = localStorage.getItem(`book_progress_${initialBookCode}`)
+      if (savedProgress) {
+        const progress = JSON.parse(savedProgress)
+        if (progress.chapterId === currentChapterId) {
+          setCardNumber(progress.cardNum)
+        } else {
+          setCardNumber(1)
+        }
+      }
+      handleFetchCards()
+    }
+  }, [bookId, currentChapterId, initialBookCode, handleFetchCards])
 
   const handleCardChange = (direction: 'next' | 'previous') => {
     if (direction === 'next') {
@@ -85,21 +109,6 @@ export default function CardViewer({
       cardNum: direction === 'next' ? cardNumber + 1 : cardNumber - 1
     }))
   }
-
-  useEffect(() => {
-    if (bookId && chapterId) {
-      const savedProgress = localStorage.getItem(`book_progress_${initialBookCode}`)
-      if (savedProgress) {
-        const progress = JSON.parse(savedProgress)
-        if (progress.chapterId === chapterId) {
-          setCardNumber(progress.cardNum)
-        } else {
-          setCardNumber(1)
-        }
-      }
-      handleFetchCards()
-    }
-  }, [bookId, chapterId, initialBookCode, handleFetchCards])
 
   const handleMarkToggle = async () => {
     const token = getAuthToken()
@@ -185,61 +194,69 @@ export default function CardViewer({
 
   return (
     <div className="space-y-4">
-      <UICard className="min-h-[60vh] p-6 relative">
-        <div className="flex justify-between mb-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => handleCardChange('previous')}
-            disabled={isBookFirstPage?.(cardNumber) || (cardNumber <= 1 && isFirstChapter)}
-            className="hover:bg-accent"
-          >
-            <CornerDownLeft className="h-5 w-5" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleMarkToggle}
-            className="hover:bg-accent"
-          >
-            <Heart 
-              className={cn(
-                "h-5 w-5 transition-colors",
-                isMarked ? "fill-current text-red-500" : "text-muted-foreground"
-              )} 
-            />
-          </Button>
-        </div>
-        
-        <div 
-          className="flex-1 flex items-center justify-center cursor-pointer min-h-[40vh]"
-          onClick={() => !isBookLastPage?.(cardNumber, cards.length) && handleCardChange('next')}
-        >
-          <div 
-            className="text-center text-lg prose prose-sm max-w-none"
-            dangerouslySetInnerHTML={{ 
-              __html: currentCard?.card_context || '暂无内容'
-            }}
-          />
-        </div>
+      {cards.length > 0 ? (
+        <>
+          <UICard className="min-h-[60vh] p-6 relative">
+            <div className="flex justify-between mb-4">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => handleCardChange('previous')}
+                disabled={isBookFirstPage?.(cardNumber) || (cardNumber <= 1 && isFirstChapter)}
+                className="hover:bg-accent"
+              >
+                <CornerDownLeft className="h-5 w-5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleMarkToggle}
+                className="hover:bg-accent"
+              >
+                <Heart 
+                  className={cn(
+                    "h-5 w-5 transition-colors",
+                    isMarked ? "fill-current text-red-500" : "text-muted-foreground"
+                  )} 
+                />
+              </Button>
+            </div>
+            
+            <div 
+              className="flex-1 flex items-center justify-center cursor-pointer min-h-[40vh]"
+              onClick={() => !isBookLastPage?.(cardNumber, cards.length) && handleCardChange('next')}
+            >
+              <div 
+                className="text-center text-lg prose prose-sm max-w-none"
+                dangerouslySetInnerHTML={{ 
+                  __html: currentCard?.card_context || '暂无内容'
+                }}
+              />
+            </div>
 
-        <div className="absolute bottom-4 right-6">
-          <span className="text-sm text-muted-foreground">
-            {cardNumber} / {cards.length}
-          </span>
+            <div className="absolute bottom-4 right-6">
+              <span className="text-sm text-muted-foreground">
+                {cardNumber} / {cards.length}
+              </span>
+            </div>
+          </UICard>
+          
+          <div className="px-2">
+            <Slider
+              value={[cardNumber]}
+              min={1}
+              max={cards.length || 1}
+              step={1}
+              onValueChange={handleSliderChange}
+              className="w-full"
+            />
+          </div>
+        </>
+      ) : (
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <div className="text-muted-foreground">Loading...</div>
         </div>
-      </UICard>
-      
-      <div className="px-2">
-        <Slider
-          value={[cardNumber]}
-          min={1}
-          max={cards.length || 1}
-          step={1}
-          onValueChange={handleSliderChange}
-          className="w-full"
-        />
-      </div>
+      )}
     </div>
   )
 }
