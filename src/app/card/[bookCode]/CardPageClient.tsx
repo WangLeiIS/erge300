@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback, useMemo } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import CardViewer from '@/components/CardViewer'
 import ChapterList from '@/components/ChapterList'
 import { Menu } from 'lucide-react'
@@ -16,79 +16,93 @@ import { useToast } from "@/hooks/use-toast"
 import { fetchChapters } from '@/app/action'
 import { useRouter } from 'next/navigation'
 import { getAuthToken } from '@/lib/auth'
-import type { BookState, Book, Chapter } from '@/types/book'
-import { useAuth } from '@/hooks/useAuth'
+
+interface Book {
+  book_id: number
+  book_code: string
+  book_name: string
+}
+
+interface Chapter {
+  chapter_id: number
+  chapter_name: string
+  subchapters?: Chapter[]
+}
 
 interface CardPageClientProps {
   bookCode: string
   initialBook: Book
 }
 
-const findNextChapter = (chapters: Chapter[], currentChapterId: number) => {
-  const flatChapters = chapters.reduce((flat: Chapter[], chapter) => {
-    return flat.concat([chapter], chapter.subchapters || [])
-  }, [])
-  const currentIndex = flatChapters.findIndex(c => c.chapter_id === currentChapterId)
-  return flatChapters[currentIndex + 1]
-}
-
-const flattenChapters = (chapters: Chapter[]) => {
-  return chapters.reduce((flat: Chapter[], chapter) => {
-    return flat.concat([chapter], chapter.subchapters || [])
-  }, [])
-}
-
-const findPreviousChapter = (chapters: Chapter[], currentChapterId: number) => {
-  const flatChapters = flattenChapters(chapters)
-  const currentIndex = flatChapters.findIndex(c => c.chapter_id === currentChapterId)
-  return flatChapters[currentIndex - 1]
-}
-
 export default function CardPageClient({ bookCode, initialBook }: CardPageClientProps) {
-  const { isAuthenticated } = useAuth({
-    redirectTo: `/card/${bookCode}`,
-    requireAuth: true
-  })
-
-  if (!isAuthenticated) return null
-
   const { toast } = useToast()
   const router = useRouter()
-  const [bookState, setBookState] = useState<BookState>({
-    book: null,
-    currentChapter: null,
-    chapters: []
-  })
+  const [book, setBook] = useState<Book | null>(null)
+  const [currentChapter, setCurrentChapter] = useState<number | null>(null)
+  const [chapterName, setChapterName] = useState<string>('')
+  const [chapters, setChapters] = useState<Chapter[]>([])
 
-  const handleChapterSelect = useCallback((chapterId: number, name: string) => {
-    setBookState(prev => ({
-      ...prev,
-      currentChapter: {
-        id: chapterId,
-        name
-      }
-    }))
+  // 扁平化章节树的辅助函数
+  const flattenChapters = (chapters: Chapter[]): Chapter[] => {
+    return chapters.reduce((flat: Chapter[], chapter) => {
+      return flat.concat([chapter], chapter.subchapters ? flattenChapters(chapter.subchapters) : [])
+    }, [])
+  }
+
+  const findNextChapter = useCallback((chapters: Chapter[], currentChapterId: number): Chapter | null => {
+    const flatChapters = flattenChapters(chapters)
+    const currentIndex = flatChapters.findIndex(c => c.chapter_id === currentChapterId)
     
-    localStorage.setItem(`reading_progress_${bookCode}`, JSON.stringify({
-      chapterId,
-      chapterName: name
-    }))
-  }, [bookCode])
+    if (currentIndex !== -1 && currentIndex < flatChapters.length - 1) {
+      return flatChapters[currentIndex + 1]
+    }
+    return null
+  }, [])
 
+  const findPreviousChapter = useCallback((chapters: Chapter[], currentChapterId: number): Chapter | null => {
+    const flatChapters = flattenChapters(chapters)
+    const currentIndex = flatChapters.findIndex(c => c.chapter_id === currentChapterId)
+    
+    if (currentIndex > 0) {
+      return flatChapters[currentIndex - 1]
+    }
+    return null
+  }, [])
+
+  const isFirstChapter = useCallback((chapterId: number) => {
+    const flatChapters = flattenChapters(chapters)
+    return flatChapters[0]?.chapter_id === chapterId
+  }, [chapters])
+
+  const isLastChapter = useCallback((chapterId: number) => {
+    const flatChapters = flattenChapters(chapters)
+    return flatChapters[flatChapters.length - 1]?.chapter_id === chapterId
+  }, [chapters])
+
+  const isBookFirstPage = useCallback((chapterId: number, cardNum: number) => {
+    return isFirstChapter(chapterId) && cardNum <= 1
+  }, [isFirstChapter])
+
+  const isBookLastPage = useCallback((chapterId: number, cardNum: number, totalCards: number) => {
+    return isLastChapter(chapterId) && cardNum >= totalCards
+  }, [isLastChapter])
+
+  // 添加新的副作用来自动加载章节
   useEffect(() => {
-    if (bookState.book?.book_id) {
+    if (book?.book_id) {
       const loadChapters = async () => {
         try {
-          const result = await fetchChapters(bookState.book!.book_id)
-          if (result.error) throw new Error(result.error)
-          if (!result.chapters) throw new Error('No chapters data received')
+          const result = await fetchChapters(book.book_id)
+          if (result.error) {
+            throw new Error(result.error)
+          }
+          if (!result.chapters) {
+            throw new Error('No chapters data received')
+          }
+          setChapters(result.chapters)
           
-          setBookState(prev => ({
-            ...prev,
-            chapters: result.chapters
-          }))
-          
-          if (!bookState.currentChapter && result.chapters.length > 0) {
+          // 如果没有当前章节，自动选择第一章
+          if (!currentChapter && result.chapters.length > 0) {
             const firstChapter = result.chapters[0]
             handleChapterSelect(firstChapter.chapter_id, firstChapter.chapter_name)
           }
@@ -100,9 +114,10 @@ export default function CardPageClient({ bookCode, initialBook }: CardPageClient
           })
         }
       }
+      
       loadChapters()
     }
-  }, [bookState.book?.book_id, bookState.currentChapter])
+  }, [book?.book_id, currentChapter])
 
   useEffect(() => {
     console.log('CardPageClient: Checking auth token')
@@ -130,10 +145,7 @@ export default function CardPageClient({ bookCode, initialBook }: CardPageClient
     }
     
     console.log('CardPageClient: Setting book data')
-    setBookState(prev => ({
-      ...prev,
-      book: initialBook
-    }))
+    setBook(initialBook)
     localStorage.setItem('last_read_book', JSON.stringify({
       bookCode,
       bookName: initialBook.book_name,
@@ -141,49 +153,34 @@ export default function CardPageClient({ bookCode, initialBook }: CardPageClient
     }))
   }, [initialBook, bookCode, router, toast])
 
+  const handleChapterSelect = useCallback((chapterId: number, name: string) => {
+    setCurrentChapter(chapterId)
+    setChapterName(name)
+    localStorage.setItem(`reading_progress_${bookCode}`, JSON.stringify({
+      chapterId,
+      chapterName: name
+    }))
+  }, [bookCode])
+
   const handleNextChapter = useCallback(() => {
-    const { currentChapter } = bookState
     if (!currentChapter) return
     
-    const nextChapter = findNextChapter(bookState.chapters, currentChapter.id)
+    const nextChapter = findNextChapter(chapters, currentChapter)
     if (nextChapter) {
       handleChapterSelect(nextChapter.chapter_id, nextChapter.chapter_name)
     }
-  }, [bookState, handleChapterSelect])
+  }, [chapters, currentChapter, findNextChapter, handleChapterSelect])
 
   const handlePreviousChapter = useCallback(() => {
-    const { currentChapter } = bookState
     if (!currentChapter) return
     
-    const prevChapter = findPreviousChapter(bookState.chapters, currentChapter.id)
+    const prevChapter = findPreviousChapter(chapters, currentChapter)
     if (prevChapter) {
       handleChapterSelect(prevChapter.chapter_id, prevChapter.chapter_name)
     }
-  }, [bookState, handleChapterSelect])
+  }, [chapters, currentChapter, findPreviousChapter, handleChapterSelect])
 
-  const flattenedChapters = useMemo(() => {
-    return bookState.chapters.reduce((flat: Chapter[], chapter) => {
-      return flat.concat([chapter], chapter.subchapters ? flattenChapters(chapter.subchapters) : [])
-    }, [])
-  }, [bookState.chapters])
-
-  const isFirstChapter = useCallback((chapterId: number) => {
-    return flattenedChapters[0]?.chapter_id === chapterId
-  }, [flattenedChapters])
-
-  const isLastChapter = useCallback((chapterId: number) => {
-    return flattenedChapters[flattenedChapters.length - 1]?.chapter_id === chapterId
-  }, [flattenedChapters])
-
-  const isBookFirstPage = useCallback((chapterId: number, cardNum: number) => {
-    return isFirstChapter(chapterId) && cardNum === 1
-  }, [isFirstChapter])
-
-  const isBookLastPage = useCallback((chapterId: number, cardNum: number, totalCards: number) => {
-    return isLastChapter(chapterId) && cardNum === totalCards
-  }, [isLastChapter])
-
-  if (!bookState.book) {
+  if (!book) {
     return null
   }
 
@@ -198,14 +195,14 @@ export default function CardPageClient({ bookCode, initialBook }: CardPageClient
           </SheetTrigger>
           <SheetContent side="left" className="w-[280px] sm:w-[340px] overflow-hidden flex flex-col">
             <SheetHeader>
-              <SheetTitle>{bookState.book.book_name}</SheetTitle>
+              <SheetTitle>{book.book_name}</SheetTitle>
             </SheetHeader>
             <div className="mt-6 flex-1 overflow-y-auto scrollbar-hide">
               <ChapterList 
-                bookId={bookState.book.book_id} 
+                bookId={book.book_id} 
                 onChapterSelect={handleChapterSelect}
                 onInitialChapter={(chapterId, name) => {
-                  if (!bookState.currentChapter) {
+                  if (!currentChapter) {
                     handleChapterSelect(chapterId, name)
                   }
                 }}
@@ -215,34 +212,28 @@ export default function CardPageClient({ bookCode, initialBook }: CardPageClient
         </Sheet>
         <div className="flex-1 text-center flex items-center justify-center">
           <h1 className="text-sm font-medium text-foreground/80">
-            {bookState.book.book_name}
-            {bookState.currentChapter?.name && (
+            {book.book_name}
+            {chapterName && (
               <>
                 <span className="mx-2 text-foreground/30">|</span>
-                <span className="text-foreground/60">{bookState.currentChapter.name}</span>
+                <span className="text-foreground/60">{chapterName}</span>
               </>
             )}
           </h1>
         </div>
       </div>
       <div className="w-full">
-        {bookState.currentChapter && (
+        {currentChapter && (
           <CardViewer 
-            bookId={bookState.book.book_id}
-            chapterId={bookState.currentChapter.id}
+            bookId={book.book_id}
+            chapterId={currentChapter}
             initialBookCode={bookCode}
             onNextChapter={handleNextChapter}
             onPreviousChapter={handlePreviousChapter}
-            isFirstChapter={isFirstChapter(bookState.currentChapter.id)}
-            isLastChapter={isLastChapter(bookState.currentChapter.id)}
-            isBookFirstPage={(cardNum) => {
-              if (!bookState.currentChapter) return false
-              return isBookFirstPage(bookState.currentChapter.id, cardNum)
-            }}
-            isBookLastPage={(cardNum, totalCards) => {
-              if (!bookState.currentChapter) return false
-              return isBookLastPage(bookState.currentChapter.id, cardNum, totalCards)
-            }}
+            isFirstChapter={isFirstChapter(currentChapter)}
+            isLastChapter={isLastChapter(currentChapter)}
+            isBookFirstPage={(cardNum) => isBookFirstPage(currentChapter, cardNum)}
+            isBookLastPage={(cardNum, totalCards) => isBookLastPage(currentChapter, cardNum, totalCards)}
           />
         )}
       </div>
