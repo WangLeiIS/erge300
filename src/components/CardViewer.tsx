@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils'
 import { getAuthToken, clearAuth, getUserId } from '@/lib/auth'
 import { Card as CardInterface } from '@/app/action'
 import { Slider } from "@/components/ui/slider"
+import { useAuth } from '@/contexts/auth-context'
 
 interface CardViewerProps {
   bookId: number
@@ -43,6 +44,7 @@ export default function CardViewer({
   const { toast } = useToast()
   const [isMarked, setIsMarked] = useState(false)
   const router = useRouter()
+  const { refreshAuth } = useAuth()
   
   // 使用 ref 来缓存章节内容
   const chaptersCache = useRef<Record<number, CardInterface[]>>({})
@@ -167,6 +169,7 @@ export default function CardViewer({
           console.log('CardViewer: Clearing auth due to invalid token')
           localStorage.setItem('redirect_after_login', window.location.pathname)
           clearAuth()
+          refreshAuth()
           router.push('/auth')
           return
         }

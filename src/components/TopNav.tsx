@@ -3,8 +3,6 @@
 import { User } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useRouter } from 'next/navigation'
-import { useState, useEffect } from 'react'
-import { getUsername } from '@/lib/auth'
 import { ThemeToggle } from './ThemeToggle'
 import {
   DropdownMenu,
@@ -12,17 +10,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { useAuth } from '@/contexts/auth-context'
 
 export default function TopNav() {
   const router = useRouter()
-  const [username, setUsername] = useState<string | null>(null)
-
-  useEffect(() => {
-    const currentUsername = getUsername()
-    if (username !== currentUsername) {
-      setUsername(currentUsername)
-    }
-  }, [username])
+  const { username } = useAuth()
 
   return (
     <nav className="fixed top-0 left-0 right-0 flex justify-between items-center p-4 bg-background border-b">

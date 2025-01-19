@@ -4,6 +4,7 @@ import { Toaster } from '@/components/ui/toaster'
 import BottomNav from '@/components/BottomNav'
 import { ThemeProvider } from "@/components/ThemeProvider"
 import TopNav from '@/components/TopNav'
+import { AuthProvider } from '@/contexts/auth-context'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -21,19 +22,21 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <head />
       <body>
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
-          <TopNav />
-          <div className="pt-[60px] pb-[72px] min-h-screen">
-            {children}
-          </div>
-          <BottomNav />
-          <Toaster />
-        </ThemeProvider>
+        <AuthProvider>
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange
+          >
+            <TopNav />
+            <div className="pt-[60px] pb-[72px] min-h-screen">
+              {children}
+            </div>
+            <BottomNav />
+            <Toaster />
+          </ThemeProvider>
+        </AuthProvider>
       </body>
     </html>
   )

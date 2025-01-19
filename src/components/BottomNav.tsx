@@ -3,27 +3,20 @@
 import { useRouter, usePathname } from 'next/navigation'
 import { Library, Book, Bookmark } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { useEffect, useState, useCallback } from 'react'
-import { getUsername } from '@/lib/auth'
+import { useCallback } from 'react'
+import { useAuth } from '@/contexts/auth-context'
 
 type NavButtonVariant = "default" | "ghost"
 
 export default function BottomNav() {
   const router = useRouter()
   const pathname = usePathname()
-  const [username, setUsername] = useState<string | null>(null)
+  const { username } = useAuth()
 
   const isHomePage = pathname === '/'
   const isCardPage = pathname.includes('/card/')
   const isMarksPage = pathname === '/profile/marks'
   const bookCode = isCardPage ? pathname.split('/').pop() : null
-
-  useEffect(() => {
-    const currentUsername = getUsername()
-    if (username !== currentUsername) {
-      setUsername(currentUsername)
-    }
-  }, [username])
 
   // 统一的按钮样式逻辑
   const getButtonVariant = useCallback((isActive: boolean): NavButtonVariant => {
