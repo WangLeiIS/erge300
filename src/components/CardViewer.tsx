@@ -258,7 +258,7 @@ export default function CardViewer({
               onClick={() => !isBookLastPage?.(currentCardNum, maxCardNum) && handleCardChange('next')}
             >
               <div 
-                className="text-center text-lg prose prose-sm max-w-none"
+                className="text-center text-lg prose prose-sm max-w-none prose-img:mx-auto prose-img:max-h-[40vh] prose-img:object-contain prose-img:rounded-lg"
                 dangerouslySetInnerHTML={{ 
                   __html: cards[currentCardNum]?.card_context || '暂无内容'
                 }}

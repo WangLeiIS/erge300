@@ -18,6 +18,7 @@ export default function MarkedCardsPage() {
   const [hasMore, setHasMore] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const observerTarget = useRef<HTMLDivElement>(null)
+  const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set())
   
   const router = useRouter()
   const { toast } = useToast()
@@ -142,6 +143,33 @@ export default function MarkedCardsPage() {
     })
   }
 
+  const handleImageLoad = useCallback((imageSrc: string) => {
+    setLoadedImages(prev => new Set(prev).add(imageSrc))
+  }, [])
+
+  const processHtmlContent = useCallback((html: string) => {
+    const parser = new DOMParser()
+    const doc = parser.parseFromString(html, 'text/html')
+    
+    doc.querySelectorAll('img').forEach(img => {
+      const src = img.getAttribute('src')
+      if (src) {
+        img.classList.add('mx-auto', 'max-h-[40vh]', 'object-contain', 'rounded-lg')
+        img.setAttribute('loading', 'lazy')
+        
+        if (!loadedImages.has(src)) {
+          img.classList.add('opacity-0', 'transition-opacity', 'duration-300')
+        } else {
+          img.classList.add('opacity-100')
+        }
+        
+        img.setAttribute('onload', `this.classList.add('opacity-100')`)
+      }
+    })
+    
+    return doc.body.innerHTML
+  }, [loadedImages])
+
   if (loading) {
     return <div className="container mx-auto p-4">Loading...</div>
   }
@@ -177,13 +205,12 @@ export default function MarkedCardsPage() {
                     </span>
                   </div>
                   
-                  <p 
-                    className={`text-sm mb-2 ${isExpanded ? '' : 'line-clamp-4'}`}
+                  <div 
+                    className={`text-sm mb-2 prose prose-sm max-w-none ${isExpanded ? '' : 'line-clamp-4'}`}
                     data-card-text
                     data-card-id={card.card_id}
-                  >
-                    {card.card_context}
-                  </p>
+                    dangerouslySetInnerHTML={{ __html: processHtmlContent(card.card_context) }}
+                  />
                   
                   <div className="flex justify-between items-center">
                     <div className="flex gap-2">
