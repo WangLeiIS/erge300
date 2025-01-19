@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Eye, ChevronDown, ChevronUp } from 'lucide-react'
@@ -14,46 +14,96 @@ export default function MarkedCardsPage() {
   const [loading, setLoading] = useState(true)
   const [expandedCards, setExpandedCards] = useState<Set<number>>(new Set())
   const [overflowingCards, setOverflowingCards] = useState<Set<number>>(new Set())
+  const [page, setPage] = useState(1)
+  const [hasMore, setHasMore] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const observerTarget = useRef<HTMLDivElement>(null)
+  
   const router = useRouter()
   const { toast } = useToast()
+
+  const loadMarkedCards = useCallback(async (pageNum: number, isLoadingMore = false) => {
+    const token = getAuthToken()
+    const userId = getUserId()
+    
+    if (!token || !userId) {
+      return
+    }
+
+    try {
+      if (!isLoadingMore) {
+        setLoading(true)
+      } else {
+        setLoadingMore(true)
+      }
+
+      const result = await fetchMarkedCards(token, Number(userId), pageNum)
+      
+      if (result.error) {
+        if (result.error === 'Invalid token') {
+          clearAuth()
+          router.push('/auth')
+          return
+        }
+        throw new Error(result.error)
+      }
+      
+      if (!result.data) {
+        throw new Error('No data received')
+      }
+
+      setMarkedCards(prev => 
+        isLoadingMore ? [...prev, ...result.data.items] : result.data.items
+      )
+      setHasMore(result.data.items.length === 10)
+      
+      if (result.data.items.length < 10) {
+        setPage(pageNum)
+      }
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to load marked cards',
+        variant: 'destructive',
+      })
+    } finally {
+      setLoading(false)
+      setLoadingMore(false)
+    }
+  }, [router, toast])
 
   useEffect(() => {
     const token = getAuthToken()
     const userId = getUserId()
-
+    
     if (!token || !userId) {
       router.push('/auth')
       return
     }
+  }, [router])
 
-    async function loadMarkedCards() {
-      try {
-        const result = await fetchMarkedCards(token as string, Number(userId))
-        if (result.error) {
-          if (result.error === 'Invalid token') {
-            clearAuth()
-            router.push('/auth')
-            return
-          }
-          throw new Error(result.error)
+  useEffect(() => {
+    loadMarkedCards(1)
+  }, [loadMarkedCards])
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loadingMore && !loading) {
+          const nextPage = page + 1
+          loadMarkedCards(nextPage, true)
+          setPage(nextPage)
         }
-        if (!result.data) {
-          throw new Error('No data received')
-        }
-        setMarkedCards(result.data.items)
-      } catch (error) {
-        toast({
-          title: 'Error',
-          description: error instanceof Error ? error.message : 'Failed to load marked cards',
-          variant: 'destructive',
-        })
-      } finally {
-        setLoading(false)
-      }
+      },
+      { threshold: 1.0 }
+    )
+
+    if (observerTarget.current) {
+      observer.observe(observerTarget.current)
     }
 
-    loadMarkedCards()
-  }, [router, toast])
+    return () => observer.disconnect()
+  }, [hasMore, loadingMore, loading, loadMarkedCards, page])
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString()
@@ -99,94 +149,106 @@ export default function MarkedCardsPage() {
   return (
     <div className="container mx-auto px-4">
       <div className="max-w-2xl mx-auto divide-y">
-        {markedCards.length === 0 ? (
+        {markedCards.length === 0 && !loading ? (
           <div className="py-6 text-center text-muted-foreground">
             暂无标记内容
           </div>
         ) : (
-          markedCards.map((card) => {
-            const isExpanded = expandedCards.has(card.card_id)
-            const hasOverflow = overflowingCards.has(card.card_id)
-            return (
-              <div key={card.card_id} className="py-4">
-                <div className="flex justify-between items-start mb-2">
-                  <div>
-                    <p className="font-medium">
-                      {card.book_name}
-                      <span className="text-sm text-muted-foreground ml-2">
-                        {card.chapter_name} · {card.card_num}
-                      </span>
-                    </p>
-                  </div>
-                  <span className="text-sm text-muted-foreground">
-                    {formatDate(card.mark_time)}
-                  </span>
-                </div>
-                
-                <p 
-                  className={`text-sm mb-2 ${isExpanded ? '' : 'line-clamp-4'}`}
-                  data-card-text
-                  data-card-id={card.card_id}
+          <>
+            {markedCards.map((card, index) => {
+              const isExpanded = expandedCards.has(card.card_id)
+              const hasOverflow = overflowingCards.has(card.card_id)
+              return (
+                <div 
+                  key={`${card.card_id}-${card.mark_time}-${index}`} 
+                  className="py-4"
                 >
-                  {card.card_context}
-                </p>
-                
-                <div className="flex justify-between items-center">
-                  <div className="flex gap-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-sm hover:bg-accent px-2 h-8"
-                      onClick={() => router.push(`/card/${card.book_code}`)}
-                    >
-                      <Eye className="h-4 w-4 mr-1" />
-                    </Button>
-                    {hasOverflow && (
+                  <div className="flex justify-between items-start mb-2">
+                    <div>
+                      <p className="font-medium">
+                        {card.book_name}
+                        <span className="text-sm text-muted-foreground ml-2">
+                          {card.chapter_name} · {card.card_num}
+                        </span>
+                      </p>
+                    </div>
+                    <span className="text-sm text-muted-foreground">
+                      {formatDate(card.mark_time)}
+                    </span>
+                  </div>
+                  
+                  <p 
+                    className={`text-sm mb-2 ${isExpanded ? '' : 'line-clamp-4'}`}
+                    data-card-text
+                    data-card-id={card.card_id}
+                  >
+                    {card.card_context}
+                  </p>
+                  
+                  <div className="flex justify-between items-center">
+                    <div className="flex gap-2">
                       <Button
                         variant="ghost"
                         size="sm"
                         className="text-sm hover:bg-accent px-2 h-8"
-                        onClick={() => toggleExpand(card.card_id)}
+                        onClick={() => router.push(`/card/${card.book_code}`)}
                       >
-                        {isExpanded ? (
-                          <ChevronUp className="h-4 w-4 mr-1" />
-                        ) : (
-                          <ChevronDown className="h-4 w-4 mr-1" />
-                        )}
-                        {isExpanded ? '收起' : '展开'}
+                        <Eye className="h-4 w-4 mr-1" />
                       </Button>
-                    )}
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8"
-                    onClick={async (e) => {
-                      e.stopPropagation();
-                      const token = getAuthToken();
-                      const userId = getUserId();
-                      if (!token || !userId) return;
-                      
-                      try {
-                        const result = await toggleCardMark(card.card_id, token, Number(userId), true);
-                        if (result.error) throw new Error(result.error);
+                      {hasOverflow && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-sm hover:bg-accent px-2 h-8"
+                          onClick={() => toggleExpand(card.card_id)}
+                        >
+                          {isExpanded ? (
+                            <ChevronUp className="h-4 w-4 mr-1" />
+                          ) : (
+                            <ChevronDown className="h-4 w-4 mr-1" />
+                          )}
+                          {isExpanded ? '收起' : '展开'}
+                        </Button>
+                      )}
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        const token = getAuthToken();
+                        const userId = getUserId();
+                        if (!token || !userId) return;
                         
-                        setMarkedCards(prev => prev.filter(c => c.card_id !== card.card_id));
-                      } catch (error) {
-                        toast({
-                          title: "Error",
-                          description: "取消标记失败",
-                          variant: "destructive",
-                        });
-                      }
-                    }}
-                  >
-                    <Heart className="h-4 w-4 fill-current text-red-500" />
-                  </Button>
+                        try {
+                          const result = await toggleCardMark(card.card_id, token, Number(userId), true);
+                          if (result.error) throw new Error(result.error);
+                          
+                          setMarkedCards(prev => prev.filter(c => c.card_id !== card.card_id));
+                        } catch (error) {
+                          toast({
+                            title: "Error",
+                            description: "取消标记失败",
+                            variant: "destructive",
+                          });
+                        }
+                      }}
+                    >
+                      <Heart className="h-4 w-4 fill-current text-red-500" />
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            )
-          })
+              )
+            })}
+            
+            <div 
+              ref={observerTarget} 
+              className="py-4 text-center"
+            >
+              {loadingMore && <div>加载更多...</div>}
+            </div>
+          </>
         )}
       </div>
     </div>

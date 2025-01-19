@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter, usePathname } from 'next/navigation'
-import { Library, Book, Heart } from 'lucide-react'
+import { Library, Book, Bookmark } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useEffect, useState, useCallback } from 'react'
 import { getUsername } from '@/lib/auth'
@@ -76,7 +76,7 @@ export default function BottomNav() {
           className="flex flex-col items-center gap-1"
           onClick={handleMarksClick}
         >
-          <Heart className="h-6 w-6" />
+          <Bookmark className="h-6 w-6" />
         </Button>
       </div>
     </nav>
