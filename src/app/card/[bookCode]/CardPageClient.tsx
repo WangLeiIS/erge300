@@ -144,30 +144,6 @@ export default function CardPageClient({ bookCode, initialBook }: CardPageClient
   }, [book?.book_id, bookCode, handleChapterSelect, toast])
 
   useEffect(() => {
-    console.log('CardPageClient: Checking auth token')
-    const token = getAuthToken()
-    console.log('CardPageClient: Token exists:', !!token)
-    
-    if (!token) {
-      // 检查当前是否已经在登录页面，避免重复重定向
-      const currentPath = window.location.pathname
-      console.log('CardPageClient: Current path:', currentPath)
-      
-      if (currentPath !== '/auth') {
-        const redirectPath = `/card/${bookCode}`
-        console.log('CardPageClient: Setting redirect path:', redirectPath)
-        localStorage.setItem('redirect_after_login', redirectPath)
-        
-        toast({
-          title: 'Authentication Required',
-          description: 'Please login to read books',
-          variant: 'destructive',
-        })
-        router.push('/auth')
-      }
-      return
-    }
-    
     console.log('CardPageClient: Setting book data')
     setBook(initialBook)
     localStorage.setItem('last_read_book', JSON.stringify({
@@ -175,7 +151,7 @@ export default function CardPageClient({ bookCode, initialBook }: CardPageClient
       bookName: initialBook.book_name,
       timestamp: Date.now()
     }))
-  }, [initialBook, bookCode, router, toast])
+  }, [initialBook, bookCode])
 
   // 修改其他调用 handleChapterSelect 的地方
   const handleNextChapter = useCallback(() => {

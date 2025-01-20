@@ -210,11 +210,13 @@ export default function CardViewer({
       const token = getAuthToken()
       const userId = getUserId()
       
+      // 如果没有登录，直接设置为未收藏状态，不进行查询
       if (!token || !userId) {
         setIsMarked(false)
         return
       }
 
+      // 只有在用户已登录的情况下才检查收藏状态
       const checkMark = async () => {
         try {
           const result = await checkCardMark(cards[currentCardNum].card_id, token, userId)
@@ -225,6 +227,7 @@ export default function CardViewer({
             if (result.error === 'Invalid token') {
               console.log('CardViewer: Clearing auth due to invalid token')
               clearAuth()
+              refreshAuth()
               setIsMarked(false)
               return
             }
