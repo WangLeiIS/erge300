@@ -87,7 +87,20 @@ export default function CardPageClient({ bookCode, initialBook }: CardPageClient
     return isLastChapter(chapterId) && cardNum >= totalCards
   }, [isLastChapter])
 
-  // 添加新的副作用来自动加载章节
+  // 修改 handleChapterSelect 函数，添加 cardNum 参数
+  const handleChapterSelect = useCallback((chapterId: number, name: string, cardNum: number = 1) => {
+    setCurrentChapter(chapterId)
+    setChapterName(name)
+    
+    // 保存阅读进度，使用传入的 cardNum
+    localStorage.setItem(`book_progress_${bookCode}`, JSON.stringify({
+      chapterId,
+      chapterName: name,
+      cardNum  // 使用传入的 cardNum，而不是固定为 1
+    }))
+  }, [bookCode])
+
+  // 修改恢复进度的部分
   useEffect(() => {
     if (book?.book_id) {
       const loadChapters = async () => {
@@ -101,10 +114,21 @@ export default function CardPageClient({ bookCode, initialBook }: CardPageClient
           }
           setChapters(result.chapters)
           
-          // 如果没有当前章节，自动选择第一章
-          if (!currentChapter && result.chapters.length > 0) {
+          // 尝试恢复上次阅读进度
+          const savedProgress = localStorage.getItem(`book_progress_${bookCode}`)
+          if (savedProgress) {
+            try {
+              const progress = JSON.parse(savedProgress)
+              console.log('Restoring progress:', progress)
+              // 传入保存的 cardNum
+              handleChapterSelect(progress.chapterId, progress.chapterName, progress.cardNum)
+            } catch (error) {
+              console.error('Failed to parse saved progress:', error)
+            }
+          } else if (result.chapters.length > 0) {
+            // 如果没有保存的进度，从第一章第一页开始
             const firstChapter = result.chapters[0]
-            handleChapterSelect(firstChapter.chapter_id, firstChapter.chapter_name)
+            handleChapterSelect(firstChapter.chapter_id, firstChapter.chapter_name, 1)
           }
         } catch (error) {
           toast({
@@ -117,7 +141,7 @@ export default function CardPageClient({ bookCode, initialBook }: CardPageClient
       
       loadChapters()
     }
-  }, [book?.book_id, currentChapter])
+  }, [book?.book_id, bookCode, handleChapterSelect, toast])
 
   useEffect(() => {
     console.log('CardPageClient: Checking auth token')
@@ -153,21 +177,13 @@ export default function CardPageClient({ bookCode, initialBook }: CardPageClient
     }))
   }, [initialBook, bookCode, router, toast])
 
-  const handleChapterSelect = useCallback((chapterId: number, name: string) => {
-    setCurrentChapter(chapterId)
-    setChapterName(name)
-    localStorage.setItem(`reading_progress_${bookCode}`, JSON.stringify({
-      chapterId,
-      chapterName: name
-    }))
-  }, [bookCode])
-
+  // 修改其他调用 handleChapterSelect 的地方
   const handleNextChapter = useCallback(() => {
     if (!currentChapter) return
     
     const nextChapter = findNextChapter(chapters, currentChapter)
     if (nextChapter) {
-      handleChapterSelect(nextChapter.chapter_id, nextChapter.chapter_name)
+      handleChapterSelect(nextChapter.chapter_id, nextChapter.chapter_name, 1) // 新章节从第一页开始
     }
   }, [chapters, currentChapter, findNextChapter, handleChapterSelect])
 
@@ -176,7 +192,7 @@ export default function CardPageClient({ bookCode, initialBook }: CardPageClient
     
     const prevChapter = findPreviousChapter(chapters, currentChapter)
     if (prevChapter) {
-      handleChapterSelect(prevChapter.chapter_id, prevChapter.chapter_name)
+      handleChapterSelect(prevChapter.chapter_id, prevChapter.chapter_name, 1) // 新章节从第一页开始
     }
   }, [chapters, currentChapter, findPreviousChapter, handleChapterSelect])
 
@@ -227,6 +243,7 @@ export default function CardPageClient({ bookCode, initialBook }: CardPageClient
           <CardViewer 
             bookId={book.book_id}
             chapterId={currentChapter}
+            chapterName={chapterName}
             initialBookCode={bookCode}
             onNextChapter={handleNextChapter}
             onPreviousChapter={handlePreviousChapter}

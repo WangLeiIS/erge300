@@ -16,6 +16,7 @@ import { useAuth } from '@/contexts/auth-context'
 interface CardViewerProps {
   bookId: number
   chapterId: number
+  chapterName: string
   initialBookCode: string
   onNextChapter?: () => void
   onPreviousChapter?: () => void
@@ -28,6 +29,7 @@ interface CardViewerProps {
 export default function CardViewer({ 
   bookId, 
   chapterId, 
+  chapterName,
   initialBookCode, 
   onNextChapter,
   onPreviousChapter,
@@ -36,10 +38,10 @@ export default function CardViewer({
   isBookFirstPage,
   isBookLastPage
 }: CardViewerProps) {
-  const [currentCardNum, setCurrentCardNum] = useState(1)
+  const [currentCardNum, setCurrentCardNum] = useState<number | null>(null)
   const [cards, setCards] = useState<Record<number, CardInterface>>({})
   const [maxCardNum, setMaxCardNum] = useState(1)
-  const [currentChapterId, setCurrentChapterId] = useState(chapterId)
+  const [currentChapterId, setCurrentChapterId] = useState<number | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const { toast } = useToast()
   const [isMarked, setIsMarked] = useState(false)
@@ -48,8 +50,17 @@ export default function CardViewer({
   
   // 使用 ref 来缓存章节内容
   const chaptersCache = useRef<Record<number, CardInterface[]>>({})
+  const isInitialMount = useRef(true)
 
-  const fetchChapterCards = useCallback(async (targetChapterId: number) => {
+  // 加载章节内容的函数
+  const loadChapterContent = useCallback(async (targetChapterId: number, savedCardNum?: number) => {
+    console.log('Loading chapter content:', { targetChapterId, savedCardNum })
+    if (currentChapterId === targetChapterId && currentCardNum === savedCardNum) {
+      console.log('Skip loading: same chapter and card number')
+      return
+    }
+
+    setIsLoading(true)
     try {
       const result = await fetchCard(bookId, targetChapterId)
       if (result.error) {
@@ -57,7 +68,6 @@ export default function CardViewer({
       }
 
       if (result.cards) {
-        // 将卡片数组转换为以 card_num 为 key 的对象
         const cardsMap: Record<number, CardInterface> = {}
         let maxNum = 1
         
@@ -65,32 +75,16 @@ export default function CardViewer({
           cardsMap[card.card_num] = card
           maxNum = Math.max(maxNum, card.card_num)
         })
-        
-        return { cardsMap, maxNum }
+
+        // 设置卡片编号，确保使用保存的进度
+        const validCardNum = savedCardNum ? Math.min(Math.max(1, savedCardNum), maxNum) : 1
+        console.log('Setting card number:', { savedCardNum, validCardNum, maxNum })
+
+        setCards(cardsMap)
+        setMaxCardNum(maxNum)
+        setCurrentChapterId(targetChapterId)
+        setCurrentCardNum(validCardNum)
       }
-      return { error: 'No cards found' }
-    } catch (error) {
-      return { error: error instanceof Error ? error.message : 'An error occurred' }
-    }
-  }, [bookId])
-
-  const handleChapterChange = useCallback(async (newChapterId: number) => {
-    setIsLoading(true)
-    try {
-      const result = await fetchChapterCards(newChapterId)
-      if ('error' in result) {
-        throw new Error(result.error)
-      }
-
-      setCards(result.cardsMap)
-      setMaxCardNum(result.maxNum)
-      setCurrentChapterId(newChapterId)
-      setCurrentCardNum(1) // 新章节从第一张卡片开始
-
-      localStorage.setItem(`book_progress_${initialBookCode}`, JSON.stringify({
-        chapterId: newChapterId,
-        cardNum: 1
-      }))
     } catch (error) {
       toast({
         title: 'Error',
@@ -100,9 +94,49 @@ export default function CardViewer({
     } finally {
       setIsLoading(false)
     }
-  }, [fetchChapterCards, initialBookCode, toast])
+  }, [bookId, toast, currentChapterId, currentCardNum])
 
+  // 统一的加载逻辑
+  useEffect(() => {
+    if (!bookId || !chapterId) return
+
+    const loadContent = async () => {
+      // 尝试获取保存的进度
+      let targetCardNum = 1
+      try {
+        const savedProgress = localStorage.getItem(`book_progress_${initialBookCode}`)
+        if (savedProgress) {
+          const progress = JSON.parse(savedProgress)
+          console.log('Found saved progress:', progress)
+          if (progress.chapterId === chapterId) {
+            targetCardNum = progress.cardNum
+            console.log('Using saved card number:', targetCardNum)
+          }
+        }
+      } catch (error) {
+        console.error('Failed to parse saved progress:', error)
+      }
+
+      // 只在以下情况加载内容：
+      // 1. 首次加载
+      // 2. 章节改变
+      // 3. 强制重新加载
+      if (isInitialMount.current || chapterId !== currentChapterId) {
+        console.log('Loading content:', { chapterId, targetCardNum, isInitial: isInitialMount.current })
+        await loadChapterContent(chapterId, targetCardNum)
+        isInitialMount.current = false
+      }
+    }
+
+    loadContent()
+  }, [bookId, chapterId, initialBookCode, loadChapterContent, currentChapterId])
+
+  // 处理卡片切换
   const handleCardChange = useCallback((direction: 'next' | 'previous') => {
+    if (currentCardNum === null) return
+    
+    let newCardNum: number
+    
     if (direction === 'next') {
       if (currentCardNum >= maxCardNum) {
         if (!isLastChapter) {
@@ -110,7 +144,7 @@ export default function CardViewer({
         }
         return
       }
-      setCurrentCardNum(prev => prev + 1)
+      newCardNum = currentCardNum + 1
     } else {
       if (currentCardNum <= 1) {
         if (!isFirstChapter) {
@@ -118,38 +152,23 @@ export default function CardViewer({
         }
         return
       }
-      setCurrentCardNum(prev => Math.max(1, prev - 1))
+      newCardNum = Math.max(1, currentCardNum - 1)
     }
     
+    setCurrentCardNum(newCardNum)
+    
+    // 更新阅读进度
+    const savedProgress = JSON.parse(localStorage.getItem(`book_progress_${initialBookCode}`) || '{}')
     localStorage.setItem(`book_progress_${initialBookCode}`, JSON.stringify({
+      ...savedProgress,
       chapterId: currentChapterId,
-      cardNum: direction === 'next' ? currentCardNum + 1 : currentCardNum - 1
+      cardNum: newCardNum,
+      chapterName // 保持章节名称
     }))
-  }, [currentCardNum, maxCardNum, currentChapterId, initialBookCode, isFirstChapter, isLastChapter, onNextChapter, onPreviousChapter])
-
-  // 监听章节ID的变化
-  useEffect(() => {
-    if (chapterId !== currentChapterId) {
-      handleChapterChange(chapterId)
-    }
-  }, [chapterId, currentChapterId, handleChapterChange])
-
-  // 初始加载
-  useEffect(() => {
-    if (bookId && currentChapterId) {
-      const savedProgress = localStorage.getItem(`book_progress_${initialBookCode}`)
-      if (savedProgress) {
-        const progress = JSON.parse(savedProgress)
-        if (progress.chapterId === currentChapterId) {
-          setCurrentCardNum(progress.cardNum)
-        }
-      }
-      
-      handleChapterChange(currentChapterId)
-    }
-  }, [bookId, currentChapterId, initialBookCode, handleChapterChange])
+  }, [currentCardNum, maxCardNum, currentChapterId, initialBookCode, chapterName, isFirstChapter, isLastChapter, onNextChapter, onPreviousChapter])
 
   const handleMarkToggle = async () => {
+    if (currentCardNum === null) return
     const token = getAuthToken()
     const userId = getUserId()
     if (!token || !userId || !cards[currentCardNum]) {
@@ -186,6 +205,7 @@ export default function CardViewer({
   }
 
   useEffect(() => {
+    if (currentCardNum === null) return
     if (cards[currentCardNum]?.card_id) {
       const token = getAuthToken()
       const userId = getUserId()
@@ -219,9 +239,9 @@ export default function CardViewer({
       }
       checkMark()
     }
-  }, [cards[currentCardNum]?.card_id])
+  }, [currentCardNum, cards])
 
-  const currentCard = cards[currentCardNum]
+  const currentCard = currentCardNum !== null ? cards[currentCardNum] : null
 
   return (
     <div className="space-y-4">
@@ -233,7 +253,7 @@ export default function CardViewer({
                 variant="ghost"
                 size="icon"
                 onClick={() => handleCardChange('previous')}
-                disabled={isBookFirstPage?.(currentCardNum) || (currentCardNum <= 1 && isFirstChapter)}
+                disabled={currentCardNum === null || isBookFirstPage?.(currentCardNum) || (currentCardNum <= 1 && isFirstChapter)}
                 className="hover:bg-accent"
               >
                 <CornerDownLeft className="h-5 w-5" />
@@ -255,12 +275,12 @@ export default function CardViewer({
             
             <div 
               className="flex-1 flex items-center justify-center cursor-pointer min-h-[40vh]"
-              onClick={() => !isBookLastPage?.(currentCardNum, maxCardNum) && handleCardChange('next')}
+              onClick={() => currentCardNum !== null && !isBookLastPage?.(currentCardNum, maxCardNum) && handleCardChange('next')}
             >
               <div 
                 className="text-center text-lg prose prose-sm max-w-none prose-img:mx-auto prose-img:max-h-[40vh] prose-img:object-contain prose-img:rounded-lg"
                 dangerouslySetInnerHTML={{ 
-                  __html: cards[currentCardNum]?.card_context || '暂无内容'
+                  __html: currentCard?.card_context || '暂无内容'
                 }}
               />
             </div>
@@ -274,15 +294,18 @@ export default function CardViewer({
           
           <div className="px-2">
             <Slider
-              value={[currentCardNum]}
+              value={currentCardNum !== null ? [currentCardNum] : [1]}
               min={1}
               max={maxCardNum}
               step={1}
               onValueChange={(value) => {
                 setCurrentCardNum(value[0])
+                const savedProgress = JSON.parse(localStorage.getItem(`book_progress_${initialBookCode}`) || '{}')
                 localStorage.setItem(`book_progress_${initialBookCode}`, JSON.stringify({
+                  ...savedProgress,
                   chapterId: currentChapterId,
-                  cardNum: value[0]
+                  cardNum: value[0],
+                  chapterName
                 }))
               }}
               className="w-full"
