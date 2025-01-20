@@ -1,40 +1,32 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { getUsername, clearAuth } from '@/lib/auth'
-import { logout } from '@/app/auth/action'
 import { useToast } from '@/hooks/use-toast'
 import { ThemeToggle } from "@/components/ThemeToggle"
+import { useAuth } from '@/contexts/auth-context'
 
 export default function ProfilePage() {
-  const [username, setUsername] = useState<string | null>(null)
   const router = useRouter()
   const { toast } = useToast()
+  const { username, isAuthenticated, logout: authLogout } = useAuth()
 
   useEffect(() => {
-    const currentUsername = getUsername()
-    if (!currentUsername) {
+    if (!isAuthenticated) {
+      localStorage.setItem('redirect_after_login', '/profile')
       router.push('/auth')
-      return
     }
-    setUsername(currentUsername)
-  }, [router])
+  }, [isAuthenticated, router])
 
   const handleLogout = async () => {
     try {
-      const result = await logout()
-      if (result.error) {
-        throw new Error(result.error)
-      }
-      clearAuth()
+      authLogout()
       toast({
         title: 'Success',
         description: 'Logged out successfully',
       })
-      router.push('/auth')
     } catch (error) {
       toast({
         title: 'Error',
@@ -44,7 +36,7 @@ export default function ProfilePage() {
     }
   }
 
-  if (!username) {
+  if (!isAuthenticated) {
     return null
   }
 
@@ -55,7 +47,7 @@ export default function ProfilePage() {
           <CardTitle className="text-2xl text-center">个人信息</CardTitle>
           <div className="w-20 h-20 mx-auto bg-primary/10 rounded-full flex items-center justify-center">
             <span className="text-2xl font-medium text-primary">
-              {username.charAt(0).toUpperCase()}
+              {username?.charAt(0).toUpperCase()}
             </span>
           </div>
         </CardHeader>

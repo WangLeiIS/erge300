@@ -46,7 +46,7 @@ export default function CardViewer({
   const { toast } = useToast()
   const [isMarked, setIsMarked] = useState(false)
   const router = useRouter()
-  const { refreshAuth } = useAuth()
+  const { isAuthenticated, logout } = useAuth()
   
   // 使用 ref 来缓存章节内容
   const chaptersCache = useRef<Record<number, CardInterface[]>>({})
@@ -169,27 +169,33 @@ export default function CardViewer({
 
   const handleMarkToggle = async () => {
     if (currentCardNum === null) return
-    const token = getAuthToken()
-    const userId = getUserId()
-    if (!token || !userId || !cards[currentCardNum]) {
+    
+    if (!isAuthenticated) {
       toast({
         title: 'Error',
         description: 'Please login to bookmark cards',
         variant: 'destructive',
       })
+      localStorage.setItem('redirect_after_login', window.location.pathname)
       router.push('/auth')
       return
     }
     
     try {
-      const result = await toggleCardMark(cards[currentCardNum].card_id, token, userId, isMarked)
+      const token = localStorage.getItem('auth_token')
+      const userId = localStorage.getItem('user_id')
+      const result = await toggleCardMark(
+        cards[currentCardNum].card_id, 
+        token!, 
+        parseInt(userId!), 
+        isMarked
+      )
+      
       if (result.error) {
         if (result.error === 'Invalid token') {
-          console.log('CardViewer: Clearing auth due to invalid token')
+          console.log('CardViewer: Invalid token detected')
           localStorage.setItem('redirect_after_login', window.location.pathname)
-          clearAuth()
-          refreshAuth()
-          router.push('/auth')
+          logout()
           return
         }
         throw new Error(result.error)
@@ -227,7 +233,6 @@ export default function CardViewer({
             if (result.error === 'Invalid token') {
               console.log('CardViewer: Clearing auth due to invalid token')
               clearAuth()
-              refreshAuth()
               setIsMarked(false)
               return
             }

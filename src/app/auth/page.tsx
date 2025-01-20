@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { useToast } from '@/hooks/use-toast'
 import { register, login } from './action'
 import { setAuthToken, setUsername, setUserId } from '@/lib/auth'
+import { useAuth } from '@/contexts/auth-context'
 
 export default function AuthPage() {
   const [isLogin, setIsLogin] = useState(true)
@@ -16,6 +17,7 @@ export default function AuthPage() {
   const [inviteCode, setInviteCode] = useState('')
   const { toast } = useToast()
   const router = useRouter()
+  const { login: authLogin } = useAuth()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -28,11 +30,7 @@ export default function AuthPage() {
           throw new Error(result.error)
         }
         
-        setAuthToken(result.access_token)
-        setUsername(username)
-        setUserId(result.user_id)
-        
-        await new Promise(resolve => setTimeout(resolve, 100))
+        authLogin(result.access_token, username, result.user_id)
         
         toast({
           title: 'Success',

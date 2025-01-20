@@ -14,7 +14,7 @@ import { useAuth } from '@/contexts/auth-context'
 
 export default function TopNav() {
   const router = useRouter()
-  const { username } = useAuth()
+  const { username, isAuthenticated } = useAuth()
 
   return (
     <nav className="fixed top-0 left-0 right-0 flex justify-between items-center p-4 bg-background border-b">
@@ -31,7 +31,7 @@ export default function TopNav() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              {username ? (
+              {isAuthenticated ? (
                 <DropdownMenuItem onClick={() => router.push('/profile')}>
                   个人信息
                 </DropdownMenuItem>
