@@ -51,6 +51,7 @@ export default function CardViewer({
   // 使用 ref 来缓存章节内容
   const chaptersCache = useRef<Record<number, CardInterface[]>>({})
   const isInitialMount = useRef(true)
+  const [isAltBackground, setIsAltBackground] = useState(false)
 
   // 加载章节内容的函数
   const loadChapterContent = useCallback(async (targetChapterId: number, savedCardNum?: number) => {
@@ -130,6 +131,10 @@ export default function CardViewer({
 
     loadContent()
   }, [bookId, chapterId, initialBookCode, loadChapterContent, currentChapterId])
+
+  useEffect(() => {
+    setIsAltBackground(prev => !prev);
+  }, [currentCardNum]);
 
   // 处理卡片切换
   const handleCardChange = useCallback((direction: 'next' | 'previous') => {
@@ -252,55 +257,60 @@ export default function CardViewer({
   const currentCard = currentCardNum !== null ? cards[currentCardNum] : null
 
   return (
-    <div className="space-y-4">
+    <div className="w-full space-y-4">
       {!isLoading && Object.keys(cards).length > 0 ? (
         <>
-          <UICard className="min-h-[60vh] p-6 relative">
-            <div className="flex justify-between mb-4">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => handleCardChange('previous')}
-                disabled={currentCardNum === null || isBookFirstPage?.(currentCardNum) || (currentCardNum <= 1 && isFirstChapter)}
-                className="hover:bg-accent"
-              >
-                <CornerDownLeft className="h-5 w-5" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleMarkToggle}
-                className="hover:bg-accent"
-              >
-                <Heart 
-                  className={cn(
-                    "h-5 w-5 transition-colors",
-                    isMarked ? "fill-current text-red-500" : "text-muted-foreground"
-                  )} 
-                />
-              </Button>
-            </div>
-            
-            <div 
-              className="flex-1 flex items-center justify-center cursor-pointer min-h-[40vh]"
-              onClick={() => currentCardNum !== null && !isBookLastPage?.(currentCardNum, maxCardNum) && handleCardChange('next')}
-            >
+          <div className="flex justify-center w-full">
+            <UICard className={cn(
+              "w-full max-w-5xl min-h-[60vh] p-6 relative transition-colors duration-1000",
+              isAltBackground ? "bg-card-alt" : "bg-card"
+            )}>
+              <div className="flex justify-between mb-4">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => handleCardChange('previous')}
+                  disabled={currentCardNum === null || isBookFirstPage?.(currentCardNum) || (currentCardNum <= 1 && isFirstChapter)}
+                  className="hover:bg-accent"
+                >
+                  <CornerDownLeft className="h-5 w-5" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleMarkToggle}
+                  className="hover:bg-accent"
+                >
+                  <Heart 
+                    className={cn(
+                      "h-5 w-5 transition-colors",
+                      isMarked ? "fill-current text-red-500" : "text-muted-foreground"
+                    )} 
+                  />
+                </Button>
+              </div>
+              
               <div 
-                className="text-center text-lg prose prose-sm max-w-none prose-img:mx-auto prose-img:max-h-[40vh] prose-img:object-contain prose-img:rounded-lg"
-                dangerouslySetInnerHTML={{ 
-                  __html: currentCard?.card_context || '暂无内容'
-                }}
-              />
-            </div>
+                className="flex-1 flex items-center justify-center cursor-pointer min-h-[40vh]"
+                onClick={() => currentCardNum !== null && !isBookLastPage?.(currentCardNum, maxCardNum) && handleCardChange('next')}
+              >
+                <div 
+                  className="text-center text-lg prose prose-sm max-w-none prose-img:mx-auto prose-img:max-h-[40vh] prose-img:object-contain prose-img:rounded-lg"
+                  dangerouslySetInnerHTML={{ 
+                    __html: currentCard?.card_context || '暂无内容'
+                  }}
+                />
+              </div>
 
-            <div className="absolute bottom-4 right-6">
-              <span className="text-sm text-muted-foreground">
-                {currentCardNum} / {maxCardNum}
-              </span>
-            </div>
-          </UICard>
+              <div className="absolute bottom-4 right-6">
+                <span className="text-sm text-muted-foreground">
+                  {currentCardNum} / {maxCardNum}
+                </span>
+              </div>
+            </UICard>
+          </div>
           
-          <div className="px-2">
+          <div className="w-full max-w-5xl mx-auto px-6">
             <Slider
               value={currentCardNum !== null ? [currentCardNum] : [1]}
               min={1}
@@ -316,7 +326,6 @@ export default function CardViewer({
                   chapterName
                 }))
               }}
-              className="w-full"
             />
           </div>
         </>
