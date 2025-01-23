@@ -17,10 +17,10 @@ export default function TopNav() {
   const { username, isAuthenticated } = useAuth()
 
   return (
-    <nav className="fixed top-0 left-0 right-0 flex justify-between items-center p-4 bg-background border-b">
+    <nav className="fixed top-0 left-0 right-0 flex justify-between items-center p-2 bg-background border-b z-50">
       <div className="container mx-auto max-w-6xl flex justify-between items-center">
         <div className="flex items-center">
-          <h1 className="text-xl font-bold">Read.Yoga</h1>
+          <h1 className="text-lg font-bold">Read.Yoga</h1>
         </div>
         <div className="flex items-center gap-4">
           <ThemeToggle />
