@@ -6,7 +6,7 @@ import { books } from '@/data/books'
 
 export default function BookList() {
   return (
-    <div className="columns-2 sm:columns-3 md:columns-4 lg:columns-5 gap-4 p-4">
+    <div className="columns-2 sm:columns-3 md:columns-4 lg:columns-5 gap-1 p-1">
       {books.map((book) => (
         <div 
           key={book.book_id}

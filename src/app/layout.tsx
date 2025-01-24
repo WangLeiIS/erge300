@@ -30,7 +30,7 @@ export default function RootLayout({
             disableTransitionOnChange
           >
             <TopNav />
-            <div className="pt-[60px] pb-[72px] min-h-screen">
+            <div className="pt-[40px] pb-[72px] min-h-screen">
               {children}
             </div>
             <BottomNav />

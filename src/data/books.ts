@@ -50,19 +50,19 @@ export const books: Book[] = [
   },
   {
     book_id: 6,
-    book_code: "Call_to_Arms",
+    book_code: "panghuang",
     book_name: "彷徨",
     author: "鲁迅",
     cover_url: "/images/panghuang.jpg",
-    link: "/card/Call_to_Arms"
+    link: "/card/panghuang"
   },
   {
     book_id: 7,
-    book_code: "Call_to_Arms",
+    book_code: "gushixinbian",
     book_name: "故事新编",
     author: "鲁迅",
     cover_url: "/images/故事新编.jpg",
-    link: "/card/Call_to_Arms"
+    link: "/card/gushixinbian"
   },
   {
     book_id: 8,
